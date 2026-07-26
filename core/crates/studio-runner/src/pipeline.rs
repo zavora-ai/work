@@ -526,6 +526,79 @@ impl Engine {
         Ok(())
     }
 
+    /// Change how a range looks, by hand.
+    ///
+    /// Formatting is a change to the file like any other, so it goes through the gate and the
+    /// change log rather than round the side. Only what the User actually chose is sent: an
+    /// absent field leaves the file's own formatting alone, so making something bold does not
+    /// quietly reset its colour.
+    pub async fn format_by_hand(
+        &self,
+        path: &str,
+        sheet: &str,
+        range: &str,
+        how: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<(), RunError> {
+        let file = std::path::Path::new(path);
+        let kind = ArtefactKind::of(file).ok_or(RunError::UnknownKind)?;
+        if kind != ArtefactKind::Spreadsheet {
+            return Err(RunError::UnknownKind);
+        }
+        let binary = self.command_for(kind)?;
+        let server = Server::start(kind.server_spec(binary.to_string_lossy()))
+            .await
+            .map_err(|detail| RunError::ServerUnavailable { detail })?;
+
+        let classifier = kind.classifier();
+        for operation in ["set_cell_format", "save_workbook"] {
+            let decision = studio_gate::decide(
+                &classifier,
+                kind.server_name(),
+                operation,
+                JobKind::OneOff,
+                JobState::Active,
+                RunMode::Live,
+                false,
+            );
+            if matches!(decision, studio_gate::Decision::Suppress { .. }) {
+                return Err(RunError::NotAllowed {
+                    detail: format!("the gate refused {operation}"),
+                });
+            }
+        }
+
+        let opened = server
+            .call(
+                "open_workbook",
+                serde_json::json!({ "file_path": path, "read_only": false }),
+            )
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+        let handle = find_handle(&opened).ok_or_else(|| RunError::Failed {
+            detail: format!("no handle in the answer to open_workbook: {opened}"),
+        })?;
+
+        let mut arguments = how.clone();
+        arguments.insert("workbook_id".to_string(), serde_json::json!(handle));
+        arguments.insert("sheet_name".to_string(), serde_json::json!(sheet));
+        arguments.insert("range".to_string(), serde_json::json!(range));
+
+        server
+            .call("set_cell_format", serde_json::Value::Object(arguments))
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+
+        server
+            .call(
+                "save_workbook",
+                serde_json::json!({ "workbook_id": handle, "file_path": path }),
+            )
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+        Ok(())
+    }
+
+    /// Change one thing by hand.
     pub async fn edit_by_hand(
         &self,
         path: &str,
@@ -533,6 +606,26 @@ impl Engine {
         what: &str,
         value: &str,
     ) -> Result<(), RunError> {
+        self.edit_many_by_hand(path, where_at, &[(what.to_string(), value.to_string())])
+            .await
+    }
+
+    /// Change several cells by hand in one pass.
+    ///
+    /// Pasting a block is one change to the User, and doing it a cell at a time would open and
+    /// save the file once per cell — slow, and a dozen entries in the history for one action.
+    /// Only spreadsheets can take more than one at a time; the others fall back to the first,
+    /// because a document paragraph and a slide shape are addressed one at a time by nature.
+    pub async fn edit_many_by_hand(
+        &self,
+        path: &str,
+        where_at: &str,
+        changes: &[(String, String)],
+    ) -> Result<(), RunError> {
+        let Some((what, value)) = changes.first() else {
+            return Ok(());
+        };
+        let (what, value) = (what.as_str(), value.as_str());
         let file = std::path::Path::new(path);
         let kind = ArtefactKind::of(file).ok_or(RunError::UnknownKind)?;
         let binary = self.command_for(kind)?;
@@ -606,7 +699,13 @@ impl Engine {
             ArtefactKind::Spreadsheet => serde_json::json!({
                 handle_key: handle,
                 "sheet_name": where_at,
-                "cells": [{ "cell": what, "value": typed_value(value) }],
+                "cells": changes
+                    .iter()
+                    .map(|(cell, value)| serde_json::json!({
+                        "cell": cell,
+                        "value": typed_value(value),
+                    }))
+                    .collect::<Vec<_>>(),
             }),
             ArtefactKind::Document => serde_json::json!({
                 handle_key: handle,

@@ -36,7 +36,21 @@ contextBridge.exposeInMainWorld("studio", {
   }) => ipcRenderer.invoke("core:addCapability", body),
   capabilityAction: (body: { id: string; action: string; agents?: string[] }) =>
     ipcRenderer.invoke("core:capabilityAction", body),
-  edit: (body: { path: string; sheet: string; cell: string; value: string; thread?: string }) =>
+  format: (body: {
+    path: string;
+    sheet: string;
+    range: string;
+    how: Record<string, unknown>;
+    thread?: string;
+  }) => ipcRenderer.invoke("core:format", body),
+  edit: (body: {
+    path: string;
+    sheet: string;
+    cell: string;
+    value: string;
+    thread?: string;
+    more?: { cell: string; value: string }[];
+  }) =>
     ipcRenderer.invoke("core:edit", body),
   files: (within?: string) => ipcRenderer.invoke("core:files", within),
   newFolder: (body: { name: string; within?: string }) =>

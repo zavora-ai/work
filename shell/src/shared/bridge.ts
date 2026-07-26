@@ -78,12 +78,23 @@ export interface StudioBridge {
    *
    * Goes the same way an agent's change does, so one history holds both.
    */
+  /** Change how a range looks. The same gate and history as any other change. */
+  format(body: {
+    path: string;
+    sheet: string;
+    range: string;
+    how: Record<string, unknown>;
+    thread?: string;
+  }): Promise<unknown>;
+
   edit(body: {
     path: string;
     sheet: string;
     cell: string;
     value: string;
     thread?: string;
+    /** More cells changed by the same action, as pasting a block is. */
+    more?: { cell: string; value: string }[];
   }): Promise<unknown>;
 
   /** What is really in the User's folder. */

@@ -241,6 +241,21 @@ export function SpreadsheetWorkspace(
   props: WorkspaceProps & { path?: string; thread?: string; askOnOpen?: string },
 ) {
   const conversation = useAsk(props.path, props.thread ?? "spreadsheet", props.askOnOpen);
+  // What the grid says is selected. Formatting belongs to a selection, so the toolbar cannot
+  // act until it knows one.
+  const [selection, setSelection] = useState<{ sheet: string; range: string } | undefined>();
+
+  const applyFormat = async (how: Record<string, unknown>) => {
+    if (!props.path || !selection) return;
+    await window.studio?.format?.({
+      path: props.path,
+      sheet: selection.sheet,
+      range: selection.range,
+      how,
+      thread: props.thread ?? "spreadsheet",
+    });
+    setEditedAt(Date.now());
+  };
   // What Work Studio goes on, refetched after every change so an accepted note shows at once.
   // Keyed on every exchange, not just a file change: being told a preference changes no file.
   const steering = useSteering(
@@ -281,6 +296,27 @@ export function SpreadsheetWorkspace(
             }
           : undefined
       }
+      onSelection={(sheet, range) => setSelection({ sheet, range })}
+      onEditMany={
+        props.path
+          ? (sheetName, cells) => {
+              void (async () => {
+                // One write for the whole block: pasting twelve cells is one action, not twelve.
+                const [first, ...rest] = cells;
+                if (!first) return;
+                await window.studio?.edit?.({
+                  path: props.path!,
+                  sheet: sheetName,
+                  cell: first.cell,
+                  value: first.value,
+                  more: rest,
+                  thread: props.thread ?? "spreadsheet",
+                });
+                setEditedAt(Date.now());
+              })();
+            }
+          : undefined
+      }
     />
   ) : null;
 
@@ -290,10 +326,51 @@ export function SpreadsheetWorkspace(
       fileName={sheet.model?.fileName ?? "Q3 revenue model.xlsx"}
       toolbar={
         <>
-          <Button small>Format</Button>
-          <Button small>Chart</Button>
-          <Button small>Pivot</Button>
-          <Button small>Rules</Button>
+          {/* These read Format, Chart, Pivot and Rules and did nothing at all. What is here
+              now acts on whatever is selected, through the same gate and history as every
+              other change. Chart and Pivot are not here because they are not built: an
+              absent control is better than one that lies. */}
+          <Button small title="Bold" onClick={() => void applyFormat({ bold: true })}>
+            B
+          </Button>
+          <Button small title="Italic" onClick={() => void applyFormat({ italic: true })}>
+            I
+          </Button>
+          <Button
+            small
+            title="Show as money"
+            onClick={() => void applyFormat({ number_format: "#,##0.00" })}
+          >
+            0.00
+          </Button>
+          <Button
+            small
+            title="Show as a percentage"
+            onClick={() => void applyFormat({ number_format: "0.0%" })}
+          >
+            %
+          </Button>
+          <Button
+            small
+            title="Shade it"
+            onClick={() => void applyFormat({ background_color: "#FFF3C4" })}
+          >
+            Shade
+          </Button>
+          <Button
+            small
+            title="Plain again"
+            onClick={() =>
+              void applyFormat({
+                bold: false,
+                italic: false,
+                number_format: "General",
+                background_color: "#FFFFFF",
+              })
+            }
+          >
+            Plain
+          </Button>
         </>
       }
       status={

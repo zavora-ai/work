@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use zavora_xlsx::{CellValue, Workbook};
 
 pub mod format;
+pub mod numbers;
 
 /// What went wrong, in two registers.
 ///
@@ -279,8 +280,14 @@ fn read_sheet(worksheet: &zavora_xlsx::Worksheet, window: Window) -> Sheet {
 
 fn read_one(worksheet: &zavora_xlsx::Worksheet, row: u32, col: u16) -> Cell {
     let value = worksheet.read_cell(row, col);
-    let style = worksheet
-        .cell_format(row, col)
+    let cell_format = worksheet.cell_format(row, col);
+    // The code the file says this number should read by. Held so the display below can honour
+    // it: a total the file formats as "1,240.00" was appearing as "1240".
+    let code = cell_format
+        .as_ref()
+        .map(|format| format.get_num_format().to_string())
+        .unwrap_or_default();
+    let style = cell_format
         .map(format::style_of)
         .filter(|style| !style.is_plain());
 
@@ -294,7 +301,8 @@ fn read_one(worksheet: &zavora_xlsx::Worksheet, row: u32, col: u16) -> Cell {
         CellValue::String(text) => cell.display = text,
         CellValue::RichText(rich) => cell.display = rich.plain_text(),
         CellValue::Number(number) => {
-            cell.display = format::number(number);
+            cell.display =
+                numbers::by_code(number, &code).unwrap_or_else(|| format::number(number));
             cell.numeric = true;
         }
         CellValue::Bool(flag) => cell.display = if flag { "TRUE" } else { "FALSE" }.to_string(),
@@ -313,7 +321,11 @@ fn read_one(worksheet: &zavora_xlsx::Worksheet, row: u32, col: u16) -> Cell {
             // this module exists to avoid.
             match *cached_value {
                 CellValue::Number(number) => {
-                    cell.display = format::number(number);
+                    // A formula's result is formatted the same way a typed number is. A total
+                    // reading "4960000" beside a typed "4,960,000" is the same file disagreeing
+                    // with itself.
+                    cell.display =
+                        numbers::by_code(number, &code).unwrap_or_else(|| format::number(number));
                     cell.numeric = true;
                 }
                 CellValue::String(text) => cell.display = text,

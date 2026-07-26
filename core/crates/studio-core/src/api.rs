@@ -280,6 +280,7 @@ pub fn router(api: Arc<Api>) -> Router {
         .route("/thread", get(thread))
         // The User's own edit. Same path as an agent's, which is the point.
         .route("/edit", axum::routing::post(edit))
+        .route("/format", axum::routing::post(format_cells))
         // What each specialist may reach, and which of those are on.
         .route("/capabilities", get(capabilities).post(add_capability))
         .route("/capabilities/act", axum::routing::post(act_on_capability))
@@ -483,6 +484,65 @@ async fn act_on_steering(
     }
 }
 
+/// How the User wants a range to look.
+///
+/// `how` is passed through as the User chose it, and only what they chose: an absent field
+/// leaves the file's own formatting alone, so making something bold does not reset its colour.
+#[derive(Debug, Deserialize)]
+pub struct HandFormat {
+    pub path: String,
+    pub sheet: String,
+    /// A range in the file's own terms: "B2" or "B2:D9".
+    pub range: String,
+    #[serde(default)]
+    pub how: serde_json::Map<String, serde_json::Value>,
+    pub thread: Option<String>,
+}
+
+/// Formatting a range by hand. The same gate and the same history as any other change.
+#[cfg(feature = "adk")]
+async fn format_cells(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<HandFormat>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(engine) = api.engine() else {
+        return problem("Work Studio cannot change that file yet".into(), None);
+    };
+    match engine
+        .format_by_hand(&body.path, &body.sheet, &body.range, &body.how)
+        .await
+    {
+        Ok(()) => {
+            if let Some(keeper) = api.keeper.as_ref() {
+                let what = format!("you changed how {} looks at {}", body.range, body.sheet);
+                keeper.record_change(&body.path, &what, true);
+                keeper.log("action", &what);
+                if let Some(thread) = body.thread.as_deref() {
+                    let _ = keeper.ensure_thread(thread, "Editing by hand", Some(&body.path));
+                }
+            }
+            Json(serde_json::json!({ "done": true })).into_response()
+        }
+        Err(error) => problem(error.to_string(), error.detail()),
+    }
+}
+
+#[cfg(not(feature = "adk"))]
+async fn format_cells(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(_body): Json<HandFormat>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    problem("Work Studio cannot change that file yet".into(), None)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct HandEdit {
     pub path: String,
@@ -492,6 +552,18 @@ pub struct HandEdit {
     pub cell: String,
     pub value: String,
     pub thread: Option<String>,
+    /// More cells changed by the same action, as pasting a block is. Empty for a single change.
+    ///
+    /// One action, one open and save, one entry in the history — rather than one of each per
+    /// cell, which is both slow and a misleading record of what the User did.
+    #[serde(default)]
+    pub more: Vec<MoreCells>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MoreCells {
+    pub cell: String,
+    pub value: String,
 }
 
 /// A change the User made by hand.
@@ -510,21 +582,29 @@ async fn edit(
     let Some(engine) = api.engine() else {
         return problem("Work Studio cannot change that file yet".into(), None);
     };
+    let mut changes = vec![(body.cell.clone(), body.value.clone())];
+    changes.extend(body.more.iter().map(|c| (c.cell.clone(), c.value.clone())));
+
     match engine
-        .edit_by_hand(&body.path, &body.sheet, &body.cell, &body.value)
+        .edit_many_by_hand(&body.path, &body.sheet, &changes)
         .await
     {
         Ok(()) => {
             if let Some(keeper) = api.keeper.as_ref() {
-                keeper.record_change(
-                    &body.path,
-                    &format!("you changed {} at {}", body.cell, body.sheet),
-                    true,
-                );
-                keeper.log(
-                    "action",
-                    &format!("you changed {} at {}", body.cell, body.sheet),
-                );
+                // One line for one action. "you changed 12 cells from B4" is what happened;
+                // twelve lines saying one cell each is a record of the implementation.
+                let what = if body.more.is_empty() {
+                    format!("you changed {} at {}", body.cell, body.sheet)
+                } else {
+                    format!(
+                        "you changed {} cells from {} at {}",
+                        changes.len(),
+                        body.cell,
+                        body.sheet
+                    )
+                };
+                keeper.record_change(&body.path, &what, true);
+                keeper.log("action", &what);
                 if let Some(thread) = body.thread.as_deref() {
                     let _ = keeper.ensure_thread(thread, "Editing by hand", Some(&body.path));
                 }
