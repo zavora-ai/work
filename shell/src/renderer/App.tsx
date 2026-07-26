@@ -136,12 +136,13 @@ export function App() {
     };
   });
 
-  // Loaded once here so the sidebar and the canvas cannot disagree about the same file.
-  const doc = useDocument(paths.document);
-  const deck = useDeck(paths.deck);
-  const [activeSlide, setActiveSlide] = useState(0);
-  // Bumped when a file changed, so the work list and folder listings refetch.
+  // Bumped when a file changed, so the views, the work list and the folder listing refetch.
   const [conversationChangedAt, setConversationChangedAt] = useState(0);
+
+  // Loaded once here so the sidebar and the canvas cannot disagree about the same file.
+  const doc = useDocument(paths.document, conversationChangedAt);
+  const deck = useDeck(paths.deck, conversationChangedAt);
+  const [activeSlide, setActiveSlide] = useState(0);
 
   /**
    * Open one of the User's own files in the workspace that understands it.
@@ -228,11 +229,25 @@ export function App() {
 
       {workspace ? (
         route === "documentWorkspace" ? (
-          <DocumentWorkspace {...workspaceProps} state={doc} />
+          <DocumentWorkspace
+          {...workspaceProps}
+          state={doc}
+          path={paths.document}
+          thread={threadFor(paths.document)}
+          onChanged={() => setConversationChangedAt(Date.now())}
+        />
         ) : route === "spreadsheetWorkspace" ? (
           <SpreadsheetWorkspace {...workspaceProps} path={paths.sheet} thread={threadFor(paths.sheet)} />
         ) : route === "deckWorkspace" ? (
-          <DeckWorkspace {...workspaceProps} state={deck} active={activeSlide} onActive={setActiveSlide} />
+          <DeckWorkspace
+          {...workspaceProps}
+          state={deck}
+          active={activeSlide}
+          onActive={setActiveSlide}
+          path={paths.deck}
+          thread={threadFor(paths.deck)}
+          onChanged={() => setConversationChangedAt(Date.now())}
+        />
         ) : (
           <HonestLimits {...workspaceProps} />
         )

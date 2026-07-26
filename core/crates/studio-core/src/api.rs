@@ -460,10 +460,11 @@ async fn act_on_steering(
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CellEdit {
+pub struct HandEdit {
     pub path: String,
+    /// Where in the file, in the terms of its kind: a sheet name, a block index, a slide.
     pub sheet: String,
-    /// The cell in the User's own terms, e.g. "D6".
+    /// What within that: a cell reference, the word "paragraph", a shape index.
     pub cell: String,
     pub value: String,
     pub thread: Option<String>,
@@ -477,7 +478,7 @@ pub struct CellEdit {
 async fn edit(
     State(api): State<Arc<Api>>,
     headers: HeaderMap,
-    Json(body): Json<CellEdit>,
+    Json(body): Json<HandEdit>,
 ) -> axum::response::Response {
     if !api.authorised(&headers) {
         return (StatusCode::UNAUTHORIZED, "").into_response();
@@ -486,14 +487,14 @@ async fn edit(
         return problem("Work Studio cannot change that file yet".into(), None);
     };
     match engine
-        .edit_cell(&body.path, &body.sheet, &body.cell, &body.value)
+        .edit_by_hand(&body.path, &body.sheet, &body.cell, &body.value)
         .await
     {
         Ok(()) => {
             if let Some(keeper) = api.keeper.as_ref() {
                 keeper.log(
                     "action",
-                    &format!("you changed {} on {}", body.cell, body.sheet),
+                    &format!("you changed {} at {}", body.cell, body.sheet),
                 );
                 if let Some(thread) = body.thread.as_deref() {
                     let _ = keeper.ensure_thread(thread, "Editing by hand", Some(&body.path));
@@ -509,7 +510,7 @@ async fn edit(
 async fn edit(
     State(api): State<Arc<Api>>,
     headers: HeaderMap,
-    Json(_body): Json<CellEdit>,
+    Json(_body): Json<HandEdit>,
 ) -> axum::response::Response {
     if !api.authorised(&headers) {
         return (StatusCode::UNAUTHORIZED, "").into_response();

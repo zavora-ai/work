@@ -11,7 +11,7 @@
  * have opened PowerPoint.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { useSheet } from "../useSheet.ts";
 import type { DeckState, DocumentState } from "../useArtefact.ts";
@@ -41,9 +41,47 @@ interface WorkspaceProps {
 
 /* ---------------------------------------------------------------- document */
 
-export function DocumentWorkspace(props: WorkspaceProps & { state: DocumentState }) {
+export function DocumentWorkspace(
+  props: WorkspaceProps & {
+    state: DocumentState;
+    path?: string;
+    thread?: string;
+    /** Tell the app the file changed, so what is drawn is refetched. */
+    onChanged?: () => void;
+  },
+) {
   const doc = props.state;
+  const thread = props.thread ?? "document";
   const [selected, setSelected] = useState<number | undefined>(undefined);
+  const conversation = useAsk(props.path, thread);
+  const [editedAt, setEditedAt] = useState(0);
+  const steering = useSteering(thread, conversation.state.answeredAt + editedAt);
+
+  // When the file changed — by asking or by hand — what is drawn must be refetched.
+  useEffect(() => {
+    if (conversation.state.changedAt || editedAt) props.onChanged?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation.state.changedAt, editedAt]);
+
+  /**
+   * Rewrite a paragraph by hand.
+   *
+   * The same door an agent's change goes through, so one history holds both. The block
+   * identifier the Core marked is what makes it possible to say which paragraph.
+   */
+  const rewrite = (block: number, text: string) => {
+    if (!props.path) return;
+    void (async () => {
+      await window.studio?.edit?.({
+        path: props.path!,
+        sheet: String(block),
+        cell: "paragraph",
+        value: text,
+        thread,
+      });
+      setEditedAt(Date.now());
+    })();
+  };
 
   // A click anywhere in the page tells us which block it was, because the Core marked
   // every one. That is what makes a change attributable to a paragraph rather than to
@@ -102,8 +140,17 @@ export function DocumentWorkspace(props: WorkspaceProps & { state: DocumentState
           >
             {doc.model ? (
               <div
-                // The Core produced this markup from the User's own file. It is the
-                // editable view, and every block in it carries its identifier.
+                // Typing here is the User's own change. The Core produced this markup from
+                // their file and marked every block, so a rewrite can say which paragraph it
+                // was without matching on the words.
+                contentEditable={Boolean(props.path)}
+                suppressContentEditableWarning
+                onBlur={(event) => {
+                  const block = (event.target as HTMLElement).closest("[data-p]");
+                  const raw = block?.getAttribute("data-p");
+                  const text = block?.textContent ?? "";
+                  if (raw !== null && raw !== undefined) rewrite(Number(raw), text);
+                }}
                 dangerouslySetInnerHTML={{ __html: doc.model.html }}
               />
             ) : (
@@ -113,15 +160,27 @@ export function DocumentWorkspace(props: WorkspaceProps & { state: DocumentState
         )
       }
       conversation={
-        <Conversation>
-          <Bubble from="you">Tighten the termination clause</Bubble>
-          <Bubble from="studio">
-            Changed 8.1 so notice must be in writing, and left the notice period as it was.
-          </Bubble>
-          <ChangeCard summary="Changed 1 paragraph" />
-        </Conversation>
+        <LiveConversation
+          turns={conversation.state.turns}
+          refused={conversation.state.refused}
+          problem={conversation.state.problem}
+          working={conversation.state.working}
+          progress={conversation.state.progress}
+          onAsk={conversation.ask}
+        />
       }
-      details={<DocumentDetails outline={doc.model?.outline ?? []} selected={selected} />}
+      details={
+        <div style={{ padding: "14px 16px", display: "grid", gap: 18 }}>
+          <DocumentDetails outline={doc.model?.outline ?? []} selected={selected} />
+          <SteeringPanel
+            notes={steering.state.notes}
+            proposed={steering.state.proposed}
+            problem={steering.state.problem}
+            onAdd={(note) => void steering.add(note)}
+            onAct={(id, action, text) => void steering.act(id, action, text)}
+          />
+        </div>
+      }
     />
   );
 }
@@ -316,9 +375,24 @@ const BARS: [string, number, string][] = [
 ];
 
 export function DeckWorkspace(
-  props: WorkspaceProps & { state: DeckState; active: number; onActive: (index: number) => void },
+  props: WorkspaceProps & {
+    state: DeckState;
+    active: number;
+    onActive: (index: number) => void;
+    path?: string;
+    thread?: string;
+    onChanged?: () => void;
+  },
 ) {
   const deck = props.state;
+  const thread = props.thread ?? "deck";
+  const conversation = useAsk(props.path, thread);
+  const steering = useSteering(thread, conversation.state.answeredAt);
+
+  useEffect(() => {
+    if (conversation.state.changedAt) props.onChanged?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation.state.changedAt]);
   const active = props.active;
   const setActive = props.onActive;
   const [selected, setSelected] = useState<
@@ -426,20 +500,33 @@ export function DeckWorkspace(
         )
       }
       conversation={
-        <Conversation>
-          <Bubble from="you">Make a board deck from last quarter's numbers</Bubble>
-          <Bubble from="studio">
-            Built 8 slides from <b>Q3 revenue model.xlsx</b> — revenue, margin, runway and the
-            regional split.
-          </Bubble>
-          <Bubble from="you">Regional split on its own slide with a chart</Bubble>
-          <Bubble from="studio">
-            Done — slide 5. I also fixed the contrast on the axis labels so it reads on a projector.
-          </Bubble>
-          <ChangeCard summary="Changed 3 slides" />
-        </Conversation>
+        <LiveConversation
+          turns={conversation.state.turns}
+          refused={conversation.state.refused}
+          problem={conversation.state.problem}
+          working={conversation.state.working}
+          progress={conversation.state.progress}
+          onAsk={conversation.ask}
+        />
       }
-      details={<DeckDetails />}
+      details={
+        <div style={{ padding: "14px 16px", display: "grid", gap: 18 }}>
+          {/* What a click resolved to, so the User can see the thing they are about to
+              change rather than guessing from a highlight. */}
+          {selected ? (
+            <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>
+              {t("deck.selected_shape")}
+            </p>
+          ) : null}
+          <SteeringPanel
+            notes={steering.state.notes}
+            proposed={steering.state.proposed}
+            problem={steering.state.problem}
+            onAdd={(note) => void steering.add(note)}
+            onAct={(id, action, text) => void steering.act(id, action, text)}
+          />
+        </div>
+      }
     />
   );
 }

@@ -118,6 +118,8 @@ function useArtefact<T>(
   ask: ((path: string) => Promise<unknown>) | undefined,
   recognise: (value: unknown) => value is T,
   sample: T,
+  /** Bumped when the file changed, so the view shows what is now in it. */
+  changedAt?: number,
 ): State<T> {
   const [state, setState] = useState<State<T>>({
     loading: Boolean(path),
@@ -157,17 +159,17 @@ function useArtefact<T>(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path]);
+  }, [path, changedAt]);
 
   return state;
 }
 
-export function useDocument(path: string | undefined): DocumentState {
+export function useDocument(path: string | undefined, changedAt?: number): DocumentState {
   const bridge = typeof window === "undefined" ? undefined : window.studio;
-  return useArtefact(path, bridge?.document, isDocument, SAMPLE_DOCUMENT);
+  return useArtefact(path, bridge?.document, isDocument, SAMPLE_DOCUMENT, changedAt);
 }
 
-export function useDeck(path: string | undefined): DeckState {
+export function useDeck(path: string | undefined, changedAt?: number): DeckState {
   const bridge = typeof window === "undefined" ? undefined : window.studio;
-  return useArtefact(path, bridge?.deck, isDeck, SAMPLE_DECK);
+  return useArtefact(path, bridge?.deck, isDeck, SAMPLE_DECK, changedAt);
 }

@@ -343,29 +343,23 @@ impl Engine {
         self.policy.chain_for(QualityTier::Balanced).first()
     }
 
-    /// A cell the User typed themselves.
+    /// A change the User made by hand.
     ///
-    /// No model is involved — the User already knows what they want — but the same gate
-    /// decides and the same server writes, so a change made by hand and a change made for
-    /// them are the same kind of thing on the way to the file.
-    pub async fn edit_cell(
+    /// No model is involved — they already know what they want — but the same gate decides and
+    /// the same capability writes, so a change made by hand and a change made for them are the
+    /// same kind of thing on the way to the file. `where_at` and `what` name the target in the
+    /// terms of the kind: a cell reference for a spreadsheet, a block index for a document, a
+    /// shape index for a slide.
+    pub async fn edit_by_hand(
         &self,
         path: &str,
-        sheet: &str,
-        cell: &str,
+        where_at: &str,
+        what: &str,
         value: &str,
     ) -> Result<(), RunError> {
         let file = std::path::Path::new(path);
         let kind = ArtefactKind::of(file).ok_or(RunError::UnknownKind)?;
-        if kind != ArtefactKind::Spreadsheet {
-            return Err(RunError::UnknownKind);
-        }
-        let binary = self
-            .servers
-            .for_kind(kind)
-            .ok_or_else(|| RunError::ServerUnavailable {
-                detail: "no spreadsheet server provisioned".to_string(),
-            })?;
+        let binary = self.command_for(kind)?;
 
         let server = Arc::new(
             Server::start(kind.server_spec(binary.to_string_lossy()))
@@ -373,10 +367,32 @@ impl Engine {
                 .map_err(|detail| RunError::ServerUnavailable { detail })?,
         );
 
-        // The gate decides before anything is written, for the User's own edit as much as
-        // for an agent's.
+        // The three operations this needs, per kind: open, change, save.
+        let (open, change, save, handle_key) = match kind {
+            ArtefactKind::Spreadsheet => (
+                "open_workbook",
+                "write_cells",
+                "save_workbook",
+                "workbook_id",
+            ),
+            ArtefactKind::Document => (
+                "open_document",
+                "update_paragraph_text",
+                "save_document",
+                "document_handle",
+            ),
+            ArtefactKind::Presentation => (
+                "open_presentation",
+                "edit_run",
+                "save_presentation",
+                "handle",
+            ),
+        };
+
+        // The gate decides before anything is written, for the User's own edit as much as for
+        // an agent's.
         let classifier = kind.classifier();
-        for operation in ["write_cells", "save_workbook"] {
+        for operation in [change, save] {
             let decision = studio_gate::decide(
                 &classifier,
                 kind.server_name(),
@@ -393,36 +409,87 @@ impl Engine {
             }
         }
 
+        // Only the spreadsheet server takes `read_only`. The presentation server rejects an
+        // argument it does not know and the document server ignores it, so sending one shape
+        // to all three worked for two of them and failed for the third.
+        let opening = match kind {
+            ArtefactKind::Spreadsheet => {
+                serde_json::json!({ "file_path": path, "read_only": false })
+            }
+            _ => serde_json::json!({ "file_path": path }),
+        };
         let opened = server
-            .call(
-                "open_workbook",
-                serde_json::json!({ "file_path": path, "read_only": false }),
-            )
+            .call(open, opening)
             .await
             .map_err(|detail| RunError::Failed { detail })?;
         let handle = find_handle(&opened).ok_or_else(|| RunError::Failed {
-            detail: format!("no handle in the server's answer: {opened}"),
+            detail: format!("no handle in the answer to {open}: {opened}"),
         })?;
 
+        let arguments = match kind {
+            ArtefactKind::Spreadsheet => serde_json::json!({
+                handle_key: handle,
+                "sheet_name": where_at,
+                "cells": [{ "cell": what, "value": typed_value(value) }],
+            }),
+            ArtefactKind::Document => serde_json::json!({
+                handle_key: handle,
+                // The block identifier the Core marked in the editable view.
+                "index": where_at.parse::<u32>().unwrap_or(0),
+                "text": value,
+            }),
+            ArtefactKind::Presentation => serde_json::json!({
+                handle_key: handle,
+                "slide": where_at.parse::<u32>().unwrap_or(0),
+                "shape_idx": what.parse::<u32>().unwrap_or(0),
+                "para_idx": 0,
+                "run_idx": 0,
+                "text": value,
+            }),
+        };
+
         server
-            .call(
-                "write_cells",
-                serde_json::json!({
-                    "workbook_id": handle,
-                    "sheet_name": sheet,
-                    "cells": [{ "cell": cell, "value": typed_value(value) }],
-                }),
-            )
+            .call(change, arguments)
             .await
             .map_err(|detail| RunError::Failed { detail })?;
+
+        let saving = match kind {
+            ArtefactKind::Spreadsheet => {
+                serde_json::json!({ handle_key: handle, "file_path": path })
+            }
+            _ => serde_json::json!({ handle_key: handle, "output_path": path }),
+        };
         server
-            .call(
-                "save_workbook",
-                serde_json::json!({ "workbook_id": handle, "file_path": path }),
-            )
+            .call(save, saving)
             .await
             .map_err(|detail| RunError::Failed { detail })?;
         Ok(())
+    }
+
+    /// The command a specialist should use for this kind: what the User allowed, else what was
+    /// provisioned beside the app.
+    fn command_for(&self, kind: ArtefactKind) -> Result<std::path::PathBuf, RunError> {
+        let allocated = self
+            .provides
+            .as_ref()
+            .map(|provides| provides.for_agent(kind.specialist_name()))
+            .unwrap_or_default();
+        match allocated.first() {
+            Some(first) => Ok(std::path::PathBuf::from(&first.command)),
+            None if self.provides.is_some() => Err(RunError::ServerUnavailable {
+                detail: format!(
+                    "the {} specialist has not been allowed anything it can use",
+                    kind.specialist_name()
+                ),
+            }),
+            None => self
+                .servers
+                .for_kind(kind)
+                .map(|p| p.to_path_buf())
+                .ok_or_else(|| RunError::ServerUnavailable {
+                    detail: format!("no connection provisioned for {kind:?}"),
+                }),
+        }
     }
 
     /// Do the work the User asked for.

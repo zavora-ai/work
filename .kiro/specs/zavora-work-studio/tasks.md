@@ -48,6 +48,29 @@ Verified by `make ci` — formatting, clippy with `-D warnings`, 174 Core tests,
 | 3.1 Job model and state machine | Done | `studio-jobs`: `JobKind`, `JobState`, closed transition sets, read-only activation path. |
 | 3.2 Property 4 test | Done | `property_4_transition_set_is_closed_per_kind` is exhaustive over every `(kind, from, to)` triple; `property_4_rejection_does_not_mutate` proves rejection leaves state untouched. |
 
+### All three artefacts, end to end
+
+Driven in the built application against a live model, not only in tests.
+
+| What | State | Evidence |
+|---|---|---|
+| Ask in words — document | Done | "Add a clause 10 headed Governing law…" produced clause 10 and the Kenya sentence; the page reloaded on its own after 72s |
+| Ask in words — deck | Done | "Add a final slide that says Thank you" produced a third slide, title read back from the file |
+| Editing by hand — all three | Done | one `/edit` path per kind: a cell, a paragraph by block identifier, a shape's text run. Each goes through the same gate and capability as an agent's change |
+| Memory panel — all three | Done | notes and proposals per file, refetched after every exchange |
+| Views reload themselves | Done | a change by asking or by hand refetches what is drawn, the work list and the folder |
+| What a specialist may reach | Core done, no interface yet | `/capabilities` with on, off, remove and allocate; turning Spreadsheets off stops the specialist on the next request and back on restores it |
+
+Two bugs found by driving it, both of which reported success and lost the work:
+
+- **`set_title` on a newly added slide.** Reports `status: success, message: "Set title"` and the
+  slide is left with no shapes at all — the title is written to the build model and dropped when
+  an opened package is saved. The presentation specialist is now told to put the words in as a
+  text box instead, which survives, and to read the slide back before saying what it did. The
+  engine bug is unfixed and belongs upstream in `zavora-slide`.
+- **`open_presentation` rejects `read_only`** where the other two servers accept or ignore it, so
+  one shape of opening argument worked for two kinds and failed for the third.
+
 ### The spreadsheet MVP, end to end
 
 Driven in the built application rather than only in tests: the folder created on first run
