@@ -9,6 +9,7 @@
 
 mod api;
 mod capabilities;
+mod intent;
 mod keeper;
 mod overview;
 mod standings;

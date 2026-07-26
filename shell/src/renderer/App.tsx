@@ -12,7 +12,7 @@
 import { useState } from "react";
 
 import { t } from "../shared/strings.ts";
-import { TRAY } from "./fixtures.ts";
+import { useWaiting } from "./useOwn.ts";
 import { LeftPanel, type Navigator } from "./components/LeftPanel.tsx";
 import type { Pane } from "./components/Workspace.tsx";
 import { Dashboard } from "./screens/Dashboard.tsx";
@@ -119,6 +119,10 @@ export function App() {
   });
   const [threadId, setThreadId] = useState<string | undefined>();
   const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const { items: waiting } = useWaiting();
+  // A request the User made before the file existed, carried through to the specialist so
+  // starting work from a sentence produces the thing asked for rather than an empty file.
+  const [askOnOpen, setAskOnOpen] = useState<string | undefined>();
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [pane, setPane] = useState<Pane>("chat");
   // Which file each workspace is looking at.
@@ -216,7 +220,9 @@ export function App() {
         onNavigate={navigate}
         collapsed={leftCollapsed}
         onToggle={() => setLeftCollapsed((value) => !value)}
-        waitingCount={TRAY.length}
+        // The badge counts what is actually waiting. It read "4" on a first run with an
+        // empty tray, which is a number the User is asked to act on and cannot find.
+        waitingCount={waiting.length}
         // Clicking a piece of work reopens the file it was about, which is what returning
         // to it means. The list is refetched whenever a file changed.
         onOpenThread={(thread) => {
@@ -234,10 +240,16 @@ export function App() {
           state={doc}
           path={paths.document}
           thread={threadFor(paths.document)}
+          askOnOpen={askOnOpen}
           onChanged={() => setConversationChangedAt(Date.now())}
         />
         ) : route === "spreadsheetWorkspace" ? (
-          <SpreadsheetWorkspace {...workspaceProps} path={paths.sheet} thread={threadFor(paths.sheet)} />
+          <SpreadsheetWorkspace
+            {...workspaceProps}
+            path={paths.sheet}
+            thread={threadFor(paths.sheet)}
+            askOnOpen={askOnOpen}
+          />
         ) : route === "deckWorkspace" ? (
           <DeckWorkspace
           {...workspaceProps}
@@ -246,13 +258,24 @@ export function App() {
           onActive={setActiveSlide}
           path={paths.deck}
           thread={threadFor(paths.deck)}
+          askOnOpen={askOnOpen}
           onChanged={() => setConversationChangedAt(Date.now())}
         />
         ) : (
           <HonestLimits {...workspaceProps} />
         )
       ) : (
-        <Screen route={route} threadId={threadId} onNavigate={navigate} openFile={openFile} openPath={openPath} />
+        <Screen
+          route={route}
+          threadId={threadId}
+          onNavigate={navigate}
+          openFile={openFile}
+          openPath={openPath}
+          onStarted={(path, asked) => {
+            setAskOnOpen(asked);
+            openPath(path);
+          }}
+        />
       )}
 
       {REVIEW_MODE ? <Switcher route={route} onSelect={navigate} /> : null}
@@ -296,6 +319,7 @@ function Screen({
   onNavigate,
   openFile,
   openPath,
+  onStarted,
 }: {
   route: Route;
   threadId?: string;
@@ -304,6 +328,8 @@ function Screen({
   openFile?: () => void;
   /** Open one of the User's own files, by path. */
   openPath?: (path: string, kind?: string) => void;
+  /** A piece of work just started from a sentence: open it and let the specialist begin. */
+  onStarted?: (path: string, asked: string) => void;
 }) {
   switch (route) {
     case "dashboard":
@@ -319,7 +345,13 @@ function Screen({
     case "kickoffManifest":
       return <KickoffManifest />;
     case "new":
-      return <NewWork onNavigate={onNavigate} onOpenFile={openFile} />;
+      return (
+        <NewWork
+          onNavigate={onNavigate}
+          onOpenFile={openFile}
+          onStarted={onStarted}
+        />
+      );
     case "library":
       return <RecurringLibrary onNavigate={onNavigate} />;
     case "repository":

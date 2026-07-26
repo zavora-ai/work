@@ -382,6 +382,150 @@ impl Engine {
     /// same kind of thing on the way to the file. `where_at` and `what` name the target in the
     /// terms of the kind: a cell reference for a spreadsheet, a block index for a document, a
     /// shape index for a slide.
+    /// One short answer from the model, with no tools and no file.
+    ///
+    /// For the one decision that has to be made before there is a file to work on: what the User
+    /// is asking to have made. Deliberately narrow — no capability server is started, so this
+    /// cannot change anything.
+    pub async fn answer_briefly(&self, question: &str) -> Result<String, RunError> {
+        use adk_core::{Content, LlmRequest, Part};
+
+        let reference = self.model_reference().ok_or(RunError::NoModel)?;
+        let model = model_for(reference)?;
+
+        let request = LlmRequest {
+            model: reference.model.clone(),
+            contents: vec![Content {
+                role: "user".to_string(),
+                parts: vec![Part::Text {
+                    text: question.to_string(),
+                }],
+            }],
+            config: None,
+            tools: std::collections::HashMap::new(),
+            previous_response_id: None,
+        };
+
+        // Not streamed: this is one word, and the caller is holding the User's request while it
+        // waits.
+        let mut stream = model
+            .generate_content(request, false)
+            .await
+            .map_err(|error| RunError::ModelUnusable {
+                detail: error.to_string(),
+            })?;
+
+        let mut said = String::new();
+        while let Some(next) = futures::StreamExt::next(&mut stream).await {
+            let response = next.map_err(|error| RunError::ModelUnusable {
+                detail: error.to_string(),
+            })?;
+            if let Some(content) = response.content.as_ref() {
+                for part in &content.parts {
+                    if let Part::Text { text } = part {
+                        said.push_str(text);
+                    }
+                }
+            }
+        }
+
+        Ok(said)
+    }
+
+    /// Make an empty Artefact of this kind at this path.
+    ///
+    /// Creation goes through the gate and the same capability server as every other change,
+    /// rather than a file being written beside the one path the product authorises. It is the
+    /// first half of starting work from a sentence: the specialist is then asked to fill it in
+    /// through the ordinary run, so there is no second, quieter way to change a file.
+    ///
+    /// Two steps, not one. Every server creates in memory and saves separately, and none of them
+    /// takes a path when creating — `create_workbook` accepts no arguments at all. Asking for a
+    /// file at a path in one call reported success and left nothing on disk.
+    pub async fn start_new(&self, path: &std::path::Path) -> Result<(), RunError> {
+        let kind = ArtefactKind::of(path).ok_or(RunError::UnknownKind)?;
+        let binary = self.command_for(kind)?;
+
+        let server = Server::start(kind.server_spec(binary.to_string_lossy()))
+            .await
+            .map_err(|detail| RunError::ServerUnavailable { detail })?;
+
+        // Each server spells this differently, which is exactly the kind of difference that gets
+        // discovered at run time when it is written down in one place and assumed in another.
+        let (create, save, handle_key, path_key) = match kind {
+            ArtefactKind::Spreadsheet => (
+                "create_workbook",
+                "save_workbook",
+                "workbook_id",
+                "file_path",
+            ),
+            ArtefactKind::Document => (
+                "create_document",
+                "save_document",
+                "document_handle",
+                "output_path",
+            ),
+            ArtefactKind::Presentation => (
+                "create_presentation",
+                "save_presentation",
+                "handle",
+                "output_path",
+            ),
+        };
+
+        let classifier = kind.classifier();
+        for operation in [create, save] {
+            let decision = studio_gate::decide(
+                &classifier,
+                kind.server_name(),
+                operation,
+                JobKind::OneOff,
+                JobState::Active,
+                RunMode::Live,
+                false,
+            );
+            if matches!(decision, studio_gate::Decision::Suppress { .. }) {
+                return Err(RunError::NotAllowed {
+                    detail: format!("the gate refused {operation}"),
+                });
+            }
+        }
+
+        // `create_workbook` takes no arguments and refuses any it is given; the other two accept
+        // an optional format, and "blank" is what an empty one is called.
+        let making = match kind {
+            ArtefactKind::Spreadsheet => serde_json::json!({}),
+            _ => serde_json::json!({ "format": "blank" }),
+        };
+        let made = server
+            .call(create, making)
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+        let handle = find_handle(&made).ok_or_else(|| RunError::Failed {
+            detail: format!("no handle in the answer to {create}: {made}"),
+        })?;
+
+        server
+            .call(
+                save,
+                serde_json::json!({
+                    handle_key: handle,
+                    path_key: path.to_string_lossy(),
+                }),
+            )
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+
+        // A server reporting success is not evidence the file is there. This check is why the
+        // first attempt was caught: create_document answered "success" and wrote nothing.
+        if !path.exists() {
+            return Err(RunError::Failed {
+                detail: format!("{save} reported success and wrote no file"),
+            });
+        }
+        Ok(())
+    }
+
     pub async fn edit_by_hand(
         &self,
         path: &str,

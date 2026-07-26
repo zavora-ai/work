@@ -9,13 +9,7 @@
 import { useState } from "react";
 
 import { t } from "../../shared/strings.ts";
-import { useDelivered, useWaiting } from "../useOwn.ts";
-import {
-  RUN_HISTORY,
-  THREADS,
-  THREAD_NOTES,
-  type Thread,
-} from "../fixtures.ts";
+import { useDelivered, useSteering, useThreads, useTurns, useWaiting } from "../useOwn.ts";
 import { Button, Card, Field, Pill } from "../components/primitives.tsx";
 import { Empty } from "../components/states.tsx";
 import { TrayRow } from "../components/state.tsx";
@@ -138,45 +132,58 @@ export function OutTray() {
 }
 
 export function ThreadDetail({ threadId }: { threadId?: string }) {
-  const thread: Thread = THREADS.find((candidate) => candidate.id === threadId) ?? THREADS[0]!;
-  const scheduled = Boolean(thread.scheduleHuman);
+  // A piece of work, as it actually exists: what the User asked for, the conversation that
+  // followed, and what they have told Work Studio about it.
+  //
+  // The schedule, the spend and the Pause and Run now buttons are gone. They belonged to
+  // proactive work that does not exist yet, and a button that changes nothing is worse than an
+  // absent one — the User presses it and learns not to trust the screen.
+  const { threads } = useThreads();
+  const thread = threads.find((candidate) => candidate.id === threadId);
+  const turns = useTurns(threadId);
+  const { state, add } = useSteering(threadId);
+  const [typed, setTyped] = useState("");
+
+  if (!thread) {
+    return (
+      <main className="main">
+        <Empty
+          icon="check"
+          title={t("thread.not_found")}
+          what="Open a file and ask for something, and it will be here."
+        />
+      </main>
+    );
+  }
+
+  const keep = async () => {
+    if (!typed.trim()) return;
+    await add(typed);
+    setTyped("");
+  };
 
   return (
     <main className="main">
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
-        <div>
-          <h1 className="h1" style={{ marginBottom: 3 }}>
-            {thread.purpose}
-          </h1>
-          <p className="hint">
-            {[thread.scheduleHuman, thread.nextHuman && `next ${thread.nextHuman.toLowerCase()}`, thread.spendToday]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        </div>
-        <div className="ml" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {thread.badge === "needsYou" ? (
-            <Pill tone="warn" icon="warning">
-              Paused · Gmail
-            </Pill>
-          ) : (
-            <Pill tone="live">Working</Pill>
-          )}
-          {scheduled ? <Button small>{t("thread.pause")}</Button> : null}
-          <Button small>{t("thread.run_now")}</Button>
-        </div>
+      <div style={{ marginBottom: 16 }}>
+        <h1 className="h1" style={{ marginBottom: 3 }}>
+          {thread.purpose}
+        </h1>
+        {thread.file ? <p className="hint">{thread.file}</p> : null}
       </div>
 
       <div className="cols">
         <section aria-label={t("thread.what_its_done")}>
           <div className="h2">{t("thread.what_its_done")}</div>
           <div className="stack">
-            {RUN_HISTORY.map((entry) => (
-              <Card key={entry.when} style={{ padding: "11px 14px" }}>
+            {turns.length === 0 ? (
+              <p className="hint">{t("thread.nothing_said_yet")}</p>
+            ) : null}
+            {turns.map((turn, index) => (
+              <Card key={`${index}-${turn.text.slice(0, 12)}`} style={{ padding: "11px 14px" }}>
                 <div className="title" style={{ fontWeight: 560 }}>
-                  {entry.text}
+                  {turn.text}
                 </div>
-                <div className="sub">{entry.when}</div>
+                <div className="sub">{turn.from === "you" ? t("thread.you") : t("thread.me")}</div>
               </Card>
             ))}
           </div>
@@ -185,7 +192,10 @@ export function ThreadDetail({ threadId }: { threadId?: string }) {
         <section aria-label={t("thread.learned")}>
           <div className="h2">{t("thread.learned")}</div>
           <div className="stack">
-            {THREAD_NOTES.map((note) => (
+            {state.notes.length === 0 ? (
+              <p className="hint">{t("thread.nothing_told_yet")}</p>
+            ) : null}
+            {state.notes.map((note) => (
               <div
                 key={note.id}
                 style={{
@@ -204,10 +214,16 @@ export function ThreadDetail({ threadId }: { threadId?: string }) {
                     {note.provenance}
                   </div>
                 </div>
-                <Button small>{t("thread.edit")}</Button>
               </div>
             ))}
-            <Field placeholder={t("thread.new_note")} />
+            <Field
+              placeholder={t("thread.new_note")}
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void keep();
+              }}
+            />
             <p className="hint">{t("thread.everything_i_go_on")}</p>
           </div>
         </section>

@@ -131,11 +131,12 @@ impl Api {
         &self,
         thread: Option<&str>,
         text: &str,
+        applies_to: Option<&str>,
     ) -> std::result::Result<crate::keeper::NoteView, String> {
         self.keeper
             .as_ref()
             .ok_or_else(|| "nothing is being kept".to_string())?
-            .add_note(thread, text)
+            .add_note(thread, text, applies_to)
     }
 
     pub fn act_on_note(
@@ -284,6 +285,7 @@ pub fn router(api: Arc<Api>) -> Router {
         .route("/capabilities/act", axum::routing::post(act_on_capability))
         // What the Dashboard says, and what the diagnostics view shows.
         .route("/overview", get(overview))
+        .route("/start", axum::routing::post(start))
         .route("/tray", get(tray))
         .route("/standings", get(standings))
         .route("/tray/act", axum::routing::post(decide_tray))
@@ -416,11 +418,22 @@ pub struct ThreadQuery {
     pub thread: Option<String>,
 }
 
+// camelCase because the renderer speaks it. Without this the scope arrives under a name serde
+// does not know, defaults to None, and every note quietly applies to everything — which is the
+// bug this field exists to fix.
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NewNote {
     pub note: String,
     /// Absent for a note that applies to everything.
     pub thread: Option<String>,
+    /// Which Artefacts a global note applies to: `everything`, `document`, `deck`,
+    /// `spreadsheet`. Ignored for a note about one piece of work, which is already narrow.
+    ///
+    /// Settings offered these four choices and sent none of them, so "use our brand colours"
+    /// meant for decks was kept as applying to every piece of work the User has.
+    #[serde(default)]
+    pub applies_to: Option<String>,
 }
 
 async fn add_steering(
@@ -431,7 +444,11 @@ async fn add_steering(
     if !api.authorised(&headers) {
         return (StatusCode::UNAUTHORIZED, "").into_response();
     }
-    match api.add_note(body.thread.as_deref(), &body.note) {
+    match api.add_note(
+        body.thread.as_deref(),
+        &body.note,
+        body.applies_to.as_deref(),
+    ) {
         Ok(note) => Json(note).into_response(),
         Err(detail) => problem("Work Studio could not keep that note".into(), Some(&detail)),
     }
@@ -567,6 +584,123 @@ async fn thread(
             problem("Work Studio could not read that work".into(), Some(&detail))
         }
     }
+}
+
+/// Start a piece of work from a sentence.
+///
+/// The front door. It decides what the request calls for, names a file the User will recognise,
+/// creates it through the gate, and hands the original request to the specialist that owns that
+/// kind — so the answer to "make me a spreadsheet tracking Q3 expenses" is a spreadsheet
+/// tracking Q3 expenses, not a dialog asking which sort of file they meant.
+#[cfg(feature = "adk")]
+async fn start(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(wanted): Json<crate::intent::Wanted>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let asked = wanted.asked.trim().to_string();
+    if asked.is_empty() {
+        return problem("Tell me what you need and I will make a start".into(), None);
+    }
+    let Some(engine) = api.engine() else {
+        return problem("Work Studio has not been set up to think yet".into(), None);
+    };
+    let Some(keeper) = api.keeper.as_ref() else {
+        return problem("Nothing is being kept this session".into(), None);
+    };
+
+    // What kind of thing this is. The User's own words decide it where they are clear enough;
+    // where they are not, the model is asked rather than a kind being guessed, because a wrong
+    // file created silently is worse than a moment's wait.
+    let wants = match crate::intent::read_intent(&asked) {
+        Some(wants) => wants,
+        None => match ask_the_model_what_kind(&engine, &asked).await {
+            Some(wants) => wants,
+            None => {
+                return problem(
+                    "I could not tell what to make. Try naming it — a document, a deck or a spreadsheet.".into(),
+                    None,
+                );
+            }
+        },
+    };
+
+    let name = crate::intent::name_from(&asked);
+    let path = match keeper.free_path(&name, wants.extension()) {
+        Ok(path) => path,
+        Err(detail) => {
+            return problem(
+                "Work Studio could not make room for that".into(),
+                Some(&detail),
+            );
+        }
+    };
+
+    if let Err(error) = engine.start_new(&path).await {
+        let detail = error.detail().map(str::to_string);
+        return problem(error.to_string(), detail.as_deref());
+    }
+
+    let thread = format!("file:{}", path.to_string_lossy());
+    let _ = keeper.ensure_thread(&thread, &asked, Some(&path.to_string_lossy()));
+
+    // A specialist handed an empty file it has just been given asks what to put in it — which is
+    // reasonable behaviour and a poor first experience: the User described what they wanted and
+    // got five questions back. This says the file is new, once, for this piece of work.
+    //
+    // A note rather than a doctored request, so what the User typed stays what the User typed and
+    // this sits in the list they can read and change.
+    let _ = keeper.add_note(
+        Some(&thread),
+        "This file was empty when I asked for it. Make a sensible first version and tell me what \
+         you assumed, rather than asking me questions before starting.",
+        None,
+    );
+    // "action" because the schema allows seven categories and "artefact" is not one of
+    // them. A rejected write here is silent, which is how this class of bug hides.
+    keeper.log("action", &format!("started {}: {asked}", path.display()));
+
+    // Handed back before the specialist fills it in, so the User watches it happen in the file
+    // rather than waiting on a blank screen. The interface then asks in the ordinary way.
+    Json(crate::intent::Started {
+        path: path.to_string_lossy().into_owned(),
+        thread,
+        made: wants.in_words().to_string(),
+    })
+    .into_response()
+}
+
+/// When the words name nothing, ask the model — briefly, and constrained to three answers.
+#[cfg(feature = "adk")]
+async fn ask_the_model_what_kind(
+    engine: &studio_runner::pipeline::Engine,
+    asked: &str,
+) -> Option<crate::intent::Wants> {
+    let answer = engine
+        .answer_briefly(&format!(
+            "A person asked for this: {asked}\n\nWhich single word describes what to make for \
+             them: spreadsheet, document, or deck? Answer with one word and nothing else."
+        ))
+        .await
+        .ok()?;
+    crate::intent::read_intent(&answer)
+}
+
+/// Without the sibling checkouts there is nothing to make a file with, and the interface is told
+/// so plainly rather than being left waiting.
+#[cfg(not(feature = "adk"))]
+async fn start(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(_wanted): Json<crate::intent::Wanted>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    problem("Work Studio has not been set up to think yet".into(), None)
 }
 
 /// How each specialist is doing, measured rather than decorated.

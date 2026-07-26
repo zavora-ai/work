@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-function bridge() {
+export function bridge() {
   return typeof window === "undefined" ? undefined : window.studio;
 }
 
@@ -107,6 +107,36 @@ export function useThreads(changedAt?: number) {
   }, [reload, changedAt]);
 
   return { threads, reload };
+}
+
+/* --------------------------------------------------------------- one piece of work */
+
+export interface Turn {
+  /** "you" or Work Studio. */
+  from: string;
+  text: string;
+}
+
+/** The conversation about one piece of work, as it was actually held. */
+export function useTurns(thread?: string) {
+  const [turns, setTurns] = useState<Turn[]>([]);
+
+  useEffect(() => {
+    if (!thread) {
+      setTurns([]);
+      return;
+    }
+    void (async () => {
+      try {
+        const answer = (await bridge()?.thread?.(thread)) as { turns?: Turn[] } | undefined;
+        setTurns(answer?.turns ?? []);
+      } catch {
+        setTurns([]);
+      }
+    })();
+  }, [thread]);
+
+  return turns;
 }
 
 /* ------------------------------------------------------- waiting, and what went out */
@@ -405,8 +435,9 @@ export function useSteering(thread?: string, changedAt?: number) {
   }, [reload, changedAt]);
 
   const add = useCallback(
-    async (note: string) => {
-      await bridge()?.addNote?.({ note, thread });
+    /** `appliesTo` narrows a global note to one kind of Artefact. Ignored for a thread note. */
+    async (note: string, appliesTo?: string) => {
+      await bridge()?.addNote?.({ note, thread, appliesTo });
       await reload();
     },
     [thread, reload],

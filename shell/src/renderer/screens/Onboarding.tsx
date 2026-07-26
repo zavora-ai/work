@@ -7,8 +7,18 @@
  * to configure.
  */
 
+import { useState } from "react";
+
 import { t } from "../../shared/strings.ts";
-import { FILES, MORE_TEMPLATES, TEMPLATES } from "../fixtures.ts";
+import { MORE_TEMPLATES, TEMPLATES } from "../fixtures.ts";
+import { bridge, useThreads } from "../useOwn.ts";
+
+/// Which glyph a file gets, from the file itself.
+function iconFor(path: string): "sheet" | "deck" | "document" {
+  if (path.endsWith(".xlsx")) return "sheet";
+  if (path.endsWith(".pptx")) return "deck";
+  return "document";
+}
 import { Button, Card, Field, Icon } from "../components/primitives.tsx";
 import type { Route } from "../routes.ts";
 
@@ -74,16 +84,66 @@ const linkStyle = {
 export function NewWork({
   onNavigate,
   onOpenFile,
+  onStarted,
 }: {
   onNavigate: (route: Route) => void;
   onOpenFile?: () => void;
+  /** Called with the file Work Studio made, so it can be opened straight away. */
+  onStarted?: (path: string, asked: string) => void;
 }) {
-  const recent = FILES.filter((file) => file.kind !== "folder").slice(0, 3);
+  // The front door. It took a sentence and did nothing at all: the User typed what they needed,
+  // pressed return, and the screen sat still.
+  const { threads } = useThreads();
+  const recent = threads.filter((thread) => thread.file).slice(0, 3);
+  const [typed, setTyped] = useState("");
+  const [starting, setStarting] = useState(false);
+  const [refused, setRefused] = useState<string | undefined>();
+
+  const begin = async () => {
+    const asked = typed.trim();
+    if (!asked || starting) return;
+    setStarting(true);
+    setRefused(undefined);
+    try {
+      const answer = (await bridge()?.start?.({ asked })) as
+        | { path?: string; problem?: string }
+        | undefined;
+      if (answer?.path) {
+        setTyped("");
+        // Handed straight to the specialist: the User asked for a thing, so the thing opens and
+        // is filled in while they watch, rather than arriving empty with nothing said.
+        onStarted?.(answer.path, asked);
+      } else {
+        setRefused(answer?.problem ?? t("new.could_not_start"));
+      }
+    } catch {
+      setRefused(t("new.could_not_start"));
+    } finally {
+      setStarting(false);
+    }
+  };
 
   return (
     <main className="main">
       <h1 className="h1">{t("new.title")}</h1>
-      <Field placeholder={t("new.placeholder")} style={{ padding: "13px 14px", fontSize: 13.5 }} />
+      <Field
+        placeholder={t("new.placeholder")}
+        value={typed}
+        disabled={starting}
+        onChange={(event) => setTyped(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") void begin();
+        }}
+        style={{ padding: "13px 14px", fontSize: 13.5 }}
+      />
+      <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "9px 0 12px" }}>
+        <Button primary onClick={() => void begin()} disabled={starting || !typed.trim()}>
+          {starting ? t("new.starting") : t("new.make_a_start")}
+        </Button>
+        {refused ? (
+          <span style={{ fontSize: 12, color: "var(--warn-ink, #8a5a00)" }}>{refused}</span>
+        ) : null}
+      </div>
       <p className="hint" style={{ margin: "8px 0 12px" }}>
         {t("new.drop")}
       </p>
@@ -116,19 +176,13 @@ export function NewWork({
 
       <div className="h2">{t("new.resume")}</div>
       <div className="stack">
-        {recent.map((file) => (
+        {/* What the User was actually last working on, opened by its own path rather than by
+            navigating to a workspace that might be showing something else. */}
+        {recent.map((work) => (
           <button
-            key={file.id}
+            key={work.id}
             type="button"
-            onClick={() =>
-              onNavigate(
-                file.kind === "sheet"
-                  ? "spreadsheetWorkspace"
-                  : file.kind === "deck"
-                    ? "deckWorkspace"
-                    : "documentWorkspace",
-              )
-            }
+            onClick={() => onStarted?.(work.file!, work.purpose)}
             style={{
               display: "flex",
               alignItems: "center",
@@ -143,19 +197,24 @@ export function NewWork({
             }}
           >
             <Icon
-              name={file.kind === "sheet" ? "sheet" : file.kind === "deck" ? "deck" : "document"}
+              name={iconFor(work.file!)}
               size={17}
               stroke="var(--muted)"
               width={1.8}
             />
             <div>
               <div className="title" style={{ fontWeight: 560 }}>
-                {file.name}
+                {work.file!.slice(work.file!.lastIndexOf("/") + 1)}
               </div>
-              <div className="sub">{file.sub}</div>
+              <div className="sub">{work.purpose}</div>
             </div>
+            {/* The fixture said "7 versions" here. Nothing counts versions, so nothing is
+                claimed: the time it was last touched is something we actually know. */}
             <span className="ml" style={{ fontSize: 12, color: "var(--faint)" }}>
-              {file.versions} versions
+              {new Date(work.changed * 1000).toLocaleDateString([], {
+                day: "numeric",
+                month: "short",
+              })}
             </span>
           </button>
         ))}

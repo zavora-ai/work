@@ -48,12 +48,14 @@ export function DocumentWorkspace(
     thread?: string;
     /** Tell the app the file changed, so what is drawn is refetched. */
     onChanged?: () => void;
+    /** A request already made in words, sent once when the file opens. */
+    askOnOpen?: string;
   },
 ) {
   const doc = props.state;
   const thread = props.thread ?? "document";
   const [selected, setSelected] = useState<number | undefined>(undefined);
-  const conversation = useAsk(props.path, thread);
+  const conversation = useAsk(props.path, thread, props.askOnOpen);
   const [editedAt, setEditedAt] = useState(0);
   const steering = useSteering(thread, conversation.state.answeredAt + editedAt);
 
@@ -235,8 +237,10 @@ function DocumentDetails(props: {
   );
 }
 
-export function SpreadsheetWorkspace(props: WorkspaceProps & { path?: string; thread?: string }) {
-  const conversation = useAsk(props.path, props.thread ?? "spreadsheet");
+export function SpreadsheetWorkspace(
+  props: WorkspaceProps & { path?: string; thread?: string; askOnOpen?: string },
+) {
+  const conversation = useAsk(props.path, props.thread ?? "spreadsheet", props.askOnOpen);
   // What Work Studio goes on, refetched after every change so an accepted note shows at once.
   // Keyed on every exchange, not just a file change: being told a preference changes no file.
   const steering = useSteering(
@@ -382,11 +386,13 @@ export function DeckWorkspace(
     path?: string;
     thread?: string;
     onChanged?: () => void;
+    /** A request already made in words, sent once when the file opens. */
+    askOnOpen?: string;
   },
 ) {
   const deck = props.state;
   const thread = props.thread ?? "deck";
-  const conversation = useAsk(props.path, thread);
+  const conversation = useAsk(props.path, thread, props.askOnOpen);
   const steering = useSteering(thread, conversation.state.answeredAt);
 
   useEffect(() => {

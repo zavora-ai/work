@@ -59,7 +59,12 @@ function isAnswer(value: unknown): value is Answer {
  */
 const POLL_MS = 500;
 
-export function useAsk(path: string | undefined, thread: string) {
+export function useAsk(
+  path: string | undefined,
+  thread: string,
+  /** A request already made in words, to be sent once when the file opens. */
+  askOnOpen?: string,
+) {
   const [state, setState] = useState<AskState>({
     turns: [],
     working: false,
@@ -178,6 +183,17 @@ export function useAsk(path: string | undefined, thread: string) {
     },
     [path, thread],
   );
+
+  // A request the User already made, sent once as soon as the file is open. Starting work from a
+  // sentence would otherwise create an empty file and wait to be asked the same thing again.
+  const alreadySent = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!askOnOpen || !path) return;
+    const key = `${path}::${askOnOpen}`;
+    if (alreadySent.current === key) return;
+    alreadySent.current = key;
+    void ask(askOnOpen);
+  }, [askOnOpen, path, ask]);
 
   return { state, ask };
 }

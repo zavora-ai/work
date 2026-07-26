@@ -13,7 +13,16 @@
 import { useState } from "react";
 
 import { t } from "../../shared/strings.ts";
-import { GLOBAL_NOTES } from "../fixtures.ts";
+import { useSteering } from "../useOwn.ts";
+
+/// The four choices Settings offers, in the words the Core expects. Sending the label would
+/// mean nothing to it, which is how every note ended up applying to everything.
+function appliesTo(label: string): string {
+  if (label === t("settings.scope.documents")) return "document";
+  if (label === t("settings.scope.decks")) return "deck";
+  if (label === t("settings.scope.spreadsheets")) return "spreadsheet";
+  return "everything";
+}
 import { AgentsSettings } from "./AgentsSettings.tsx";
 import { CapabilitiesPane } from "./CapabilitiesPane.tsx";
 import { Accounts, Files, Spending } from "./SettingsPanes.tsx";
@@ -201,6 +210,17 @@ function General({ onDiagnostics }: { onDiagnostics?: () => void }) {
 
 function HowIShouldWork() {
   const [scope, setScope] = useState(t("settings.scope.everything"));
+  // What the User has actually told Work Studio, and the door to telling it more. The list was
+  // three invented notes, so a User reading "here is what I know about how you work" was
+  // reading someone else's preferences.
+  const [typed, setTyped] = useState("");
+  const { state, add } = useSteering();
+
+  const keep = async () => {
+    if (!typed.trim()) return;
+    await add(typed, appliesTo(scope));
+    setTyped("");
+  };
 
   return (
     <div>
@@ -209,7 +229,7 @@ function HowIShouldWork() {
       </p>
 
       <div className="stack">
-        {GLOBAL_NOTES.map((note) => (
+        {state.global.map((note) => (
           <div
             key={note.id}
             style={{
@@ -249,7 +269,15 @@ function HowIShouldWork() {
       </div>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
-        <Field placeholder={t("settings.new_note")} style={{ flex: 1 }} />
+        <Field
+          placeholder={t("settings.new_note")}
+          value={typed}
+          onChange={(event) => setTyped(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void keep();
+          }}
+          style={{ flex: 1 }}
+        />
         <Segmented
           small
           options={[
@@ -262,6 +290,11 @@ function HowIShouldWork() {
           onSelect={setScope}
         />
       </div>
+      {state.global.length === 0 ? (
+        <p className="hint" style={{ marginTop: 10 }}>
+          {t("settings.nothing_told_yet")}
+        </p>
+      ) : null}
       <p className="hint" style={{ marginTop: 14 }}>
         {t("settings.thread_wins")}
       </p>

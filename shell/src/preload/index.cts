@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld("studio", {
   health: () => ipcRenderer.invoke("core:health"),
   events: (since: number) => ipcRenderer.invoke("core:events", since),
   openFile: () => ipcRenderer.invoke("shell:openFile"),
+  start: (body: unknown) => ipcRenderer.invoke("core:start", body),
   standings: () => ipcRenderer.invoke("core:standings"),
   tray: () => ipcRenderer.invoke("core:tray"),
   trayAct: (decision: unknown) => ipcRenderer.invoke("core:trayAct", decision),

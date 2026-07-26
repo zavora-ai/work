@@ -76,6 +76,7 @@ export function Button({
   primary = false,
   small = false,
   onClick,
+  disabled,
   style,
   title,
 }: {
@@ -83,12 +84,15 @@ export function Button({
   primary?: boolean;
   small?: boolean;
   onClick?: () => void;
+  /** A control that cannot act says so, rather than accepting a press and doing nothing. */
+  disabled?: boolean;
   style?: CSSProperties;
   title?: string;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
       title={title}
       style={{
@@ -101,7 +105,10 @@ export function Button({
         fontSize: small ? 12 : 12.5,
         fontWeight: 560,
         whiteSpace: "nowrap",
-        cursor: "pointer",
+        // A control that cannot act must look as though it cannot, or the User presses it and
+        // concludes the product is broken.
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.5 : 1,
         ...style,
       }}
     >

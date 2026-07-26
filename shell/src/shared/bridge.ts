@@ -43,6 +43,9 @@ export interface StudioBridge {
    * Answers when the work is finished. Progress arrives on the event stream in the
    * meantime, because the work takes long enough that silence would read as a hang.
    */
+  /** Start a piece of work from a sentence. Answers with the file it made. */
+  start(body: { asked: string }): Promise<unknown>;
+
   /** How each specialist is doing, measured. */
   standings(): Promise<unknown>;
 
@@ -91,7 +94,7 @@ export interface StudioBridge {
   /** One piece of work: what was said, and what Work Studio goes on. */
   thread(id: string): Promise<unknown>;
   steering(id?: string): Promise<unknown>;
-  addNote(body: { note: string; thread?: string }): Promise<unknown>;
+  addNote(body: { note: string; thread?: string; appliesTo?: string }): Promise<unknown>;
   /** Accept, reword, stop or forget a note. */
   noteAction(body: { id: string; action: string; text?: string }): Promise<unknown>;
 

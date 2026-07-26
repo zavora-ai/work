@@ -258,7 +258,12 @@ impl Keeper {
     ///
     /// Anything the User types is accepted immediately: they said it, so there is nothing to
     /// confirm. Only what Work Studio worked out for itself has to be agreed to.
-    pub fn add_note(&self, thread: Option<&str>, text: &str) -> Result<NoteView, String> {
+    pub fn add_note(
+        &self,
+        thread: Option<&str>,
+        text: &str,
+        applies_to: Option<&str>,
+    ) -> Result<NoteView, String> {
         let text = text.trim();
         if text.is_empty() {
             return Err("an empty note".to_string());
@@ -276,7 +281,7 @@ impl Keeper {
                 .add_for_job(&id, thread, text, Origin::Explicit)
                 .map_err(|e| e.to_string())?,
             None => steering
-                .add_global(&id, Scope::Everything, text, Origin::Explicit)
+                .add_global(&id, scope_from(applies_to), text, Origin::Explicit)
                 .map_err(|e| e.to_string())?,
         };
         Ok(NoteView::of(&note))
@@ -515,6 +520,28 @@ impl Keeper {
         }
     }
 
+    /// A path in the User's folder that is not already taken.
+    ///
+    /// Never overwrites. Asking twice for "a budget" gives "Budget" and "Budget 2" rather than
+    /// the second request quietly replacing the first one's work.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn free_path(&self, name: &str, extension: &str) -> Result<std::path::PathBuf, String> {
+        let folder = self.home.root();
+        std::fs::create_dir_all(folder).map_err(|e| e.to_string())?;
+
+        let candidate = folder.join(format!("{name}.{extension}"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+        for attempt in 2..1000 {
+            let next = folder.join(format!("{name} {attempt}.{extension}"));
+            if !next.exists() {
+                return Ok(next);
+            }
+        }
+        Err(format!("there are already a thousand files called {name}"))
+    }
+
     /// How each specialist is doing.
     pub fn standings(&self) -> Result<Vec<crate::standings::Standing>, String> {
         let store = self.store.lock().map_err(|_| "the store was left locked")?;
@@ -605,6 +632,17 @@ impl Keeper {
 /// Only this may be replaced by a later, better name.
 pub const PLACEHOLDER_PURPOSE: &str = "Work in progress";
 
+/// Which Artefacts a global note applies to. An unrecognised word means everything, because
+/// narrowing a note the User meant broadly would silently stop it applying.
+fn scope_from(applies_to: Option<&str>) -> Scope {
+    match applies_to {
+        Some("document") | Some("documents") => Scope::Document,
+        Some("deck") | Some("decks") => Scope::Deck,
+        Some("spreadsheet") | Some("spreadsheets") => Scope::Spreadsheet,
+        _ => Scope::Everything,
+    }
+}
+
 /// A stable identifier for a path. FNV-1a, so the same file is the same Artefact next run.
 fn fnv(text: &str) -> u64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
@@ -661,7 +699,7 @@ impl studio_runner::pipeline::Provides for Keeper {
 #[cfg(feature = "adk")]
 impl studio_runner::memory::Remembers for Keeper {
     fn remember(&self, thread: &str, note: &str) -> Result<String, String> {
-        let kept = self.add_note(Some(thread), note)?;
+        let kept = self.add_note(Some(thread), note, None)?;
         self.log("action", &format!("remembered: {note}"));
         Ok(kept.provenance)
     }
@@ -686,7 +724,7 @@ mod tests {
         let keeper = keeper("typed");
         keeper.ensure_thread("t1", "Q3 model", None).unwrap();
         let note = keeper
-            .add_note(Some("t1"), "Keep figures as formulas")
+            .add_note(Some("t1"), "Keep figures as formulas", None)
             .unwrap();
         assert_eq!(note.provenance, "You told me");
         assert!(
@@ -755,8 +793,8 @@ mod tests {
     fn a_note_stopped_or_forgotten_stops_acting() {
         let keeper = keeper("stopped");
         keeper.ensure_thread("t1", "Q3 model", None).unwrap();
-        let a = keeper.add_note(Some("t1"), "First").unwrap();
-        let b = keeper.add_note(Some("t1"), "Second").unwrap();
+        let a = keeper.add_note(Some("t1"), "First", None).unwrap();
+        let b = keeper.add_note(Some("t1"), "Second", None).unwrap();
         keeper.act_on_note(&a.id, "stop", None).unwrap();
         assert_eq!(keeper.notes_for_run("t1", None), vec!["Second".to_string()]);
         keeper.act_on_note(&b.id, "forget", None).unwrap();
@@ -774,7 +812,7 @@ mod tests {
             let keeper = Keeper::open_at(&data, &home).unwrap();
             keeper.ensure_thread("t1", "Q3 model", None).unwrap();
             keeper
-                .add_note(Some("t1"), "Assumptions on their own sheet")
+                .add_note(Some("t1"), "Assumptions on their own sheet", None)
                 .unwrap();
             keeper
                 .remember_turn("t1", "you", "Add a growth column")
@@ -814,7 +852,7 @@ mod tests {
             .unwrap();
         // Adding a note creates the work if absent, and must not rename it if present.
         keeper
-            .add_note(Some("t1"), "Keep figures as formulas")
+            .add_note(Some("t1"), "Keep figures as formulas", None)
             .unwrap();
         let threads = keeper.threads().unwrap();
         assert_eq!(threads.len(), 1);
@@ -827,7 +865,7 @@ mod tests {
     fn a_placeholder_gives_way_to_a_real_name() {
         let keeper = keeper("placeholder");
         keeper
-            .add_note(Some("t2"), "Never invent a figure")
+            .add_note(Some("t2"), "Never invent a figure", None)
             .unwrap();
         assert_eq!(keeper.threads().unwrap()[0].purpose, PLACEHOLDER_PURPOSE);
         keeper
@@ -843,13 +881,15 @@ mod tests {
     fn an_empty_note_is_refused() {
         let keeper = keeper("empty");
         keeper.ensure_thread("t1", "Q3 model", None).unwrap();
-        assert!(keeper.add_note(Some("t1"), "   ").is_err());
+        assert!(keeper.add_note(Some("t1"), "   ", None).is_err());
     }
 
     #[test]
     fn a_global_note_applies_without_a_thread() {
         let keeper = keeper("global");
-        keeper.add_note(None, "Never invent a figure").unwrap();
+        keeper
+            .add_note(None, "Never invent a figure", None)
+            .unwrap();
         let view = keeper.steering_view(None).unwrap();
         assert_eq!(view.global.len(), 1);
         assert_eq!(
@@ -857,5 +897,43 @@ mod tests {
             vec!["Never invent a figure".to_string()],
             "a note about everything applies to work it has never seen"
         );
+    }
+
+    /// Settings offers four scopes and used to send none of them, so a note meant for decks
+    /// was kept as applying to every piece of work the User has.
+    #[test]
+    fn a_global_note_keeps_the_scope_the_user_chose() {
+        let keeper = keeper("scopes");
+
+        keeper
+            .add_note(None, "Use our brand colours", Some("decks"))
+            .unwrap();
+        keeper
+            .add_note(None, "Never guess a figure", Some("everything"))
+            .unwrap();
+
+        let all = keeper.steering_view(None).unwrap();
+        let deck = all
+            .global
+            .iter()
+            .find(|n| n.note == "Use our brand colours")
+            .expect("the note should be kept");
+        assert_eq!(deck.scope, "Decks", "kept for decks only: {:?}", deck.scope);
+
+        let broad = all
+            .global
+            .iter()
+            .find(|n| n.note == "Never guess a figure")
+            .unwrap();
+        assert_eq!(broad.scope, "Everything");
+    }
+
+    /// A word nobody recognises must widen rather than narrow: silently scoping a note the User
+    /// meant broadly would stop it applying without telling them.
+    #[test]
+    fn an_unrecognised_scope_applies_to_everything() {
+        assert_eq!(scope_from(Some("nonsense")), Scope::Everything);
+        assert_eq!(scope_from(None), Scope::Everything);
+        assert_eq!(scope_from(Some("spreadsheet")), Scope::Spreadsheet);
     }
 }
