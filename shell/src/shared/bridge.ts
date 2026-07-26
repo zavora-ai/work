@@ -43,6 +43,9 @@ export interface StudioBridge {
    * Answers when the work is finished. Progress arrives on the event stream in the
    * meantime, because the work takes long enough that silence would read as a hang.
    */
+  /** How each specialist is doing, measured. */
+  standings(): Promise<unknown>;
+
   /** What is waiting on the User. */
   tray(): Promise<unknown>;
   /** What the User decided about one of those things. */

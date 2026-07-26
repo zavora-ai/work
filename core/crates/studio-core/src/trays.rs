@@ -186,14 +186,14 @@ pub fn record_delivery(
             summary,
             destination,
             reversibility,
-            reversible_for.map(|seconds| now() + seconds)
+            reversible_for.map(|seconds| seconds_now() + seconds)
         ],
     )
     .map_err(|e| e.to_string())?;
     Ok(id)
 }
 
-fn now() -> i64 {
+pub fn seconds_now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)

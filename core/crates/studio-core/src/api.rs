@@ -285,6 +285,7 @@ pub fn router(api: Arc<Api>) -> Router {
         // What the Dashboard says, and what the diagnostics view shows.
         .route("/overview", get(overview))
         .route("/tray", get(tray))
+        .route("/standings", get(standings))
         .route("/tray/act", axum::routing::post(decide_tray))
         .route("/deliveries", get(deliveries))
         .route("/activity", get(activity))
@@ -568,6 +569,18 @@ async fn thread(
     }
 }
 
+/// How each specialist is doing, measured rather than decorated.
+async fn standings(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match api.keeper.as_ref().map(|k| k.standings()) {
+        Some(Ok(items)) => Json(serde_json::json!({ "specialists": items })).into_response(),
+        Some(Err(detail)) => problem("Work Studio could not measure that".into(), Some(&detail)),
+        None => Json(serde_json::json!({ "specialists": [] })).into_response(),
+    }
+}
+
 /// What is waiting on the User.
 async fn tray(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
     if !api.authorised(&headers) {
@@ -730,6 +743,14 @@ fn first_sentence(said: &str) -> String {
     trimmed[..end].trim().to_string()
 }
 
+/// Which specialist works on a file of this kind.
+#[cfg(feature = "adk")]
+fn specialist_for(path: &str) -> &'static str {
+    studio_runner::mcp::ArtefactKind::of(std::path::Path::new(path))
+        .map(|kind| kind.specialist_name())
+        .unwrap_or("unknown")
+}
+
 /// Which model the balanced tier resolves to, for pricing what a run cost.
 #[cfg(feature = "adk")]
 fn model_name() -> Option<String> {
@@ -833,11 +854,16 @@ async fn ask(
         })
     };
 
+    // Timed here because this is the wait the User actually experiences: from asking to being
+    // answered, including the connection starting up. Measuring only the model's part would
+    // report a figure that flatters the product.
+    let began = std::time::Instant::now();
     let outcome = engine
         .run_reporting(&request, |message| {
             let _ = tx.send(message.to_string());
         })
         .await;
+    let waited = began.elapsed();
     drop(tx);
     let _ = publisher.await;
 
@@ -865,6 +891,10 @@ async fn ask(
                 .unwrap_or(0);
             keeper.record_spend(&thread, micros);
         }
+        // Every run is recorded with who did it and how long it took, whether or not it
+        // changed a file — otherwise "typical wait" would only describe the runs that
+        // happened to write something.
+        keeper.record_run(&thread, specialist_for(&asked.path), waited, true);
         if outcome.saved {
             // The User's own words, not the specialist's reply. A reply is often "Done." —
             // true, and useless in a list of what happened. What they asked for is what they
@@ -910,6 +940,9 @@ async fn ask(
             // Something the User switched off is a decision waiting on them, not a fault to
             // report and forget. It goes in the tray with the way to undo it, deduped on the
             // cause so asking five times leaves one item.
+            if let Some(keeper) = api.keeper.as_ref() {
+                keeper.record_run(&thread, specialist_for(&asked.path), waited, false);
+            }
             if let (studio_runner::pipeline::RunError::NotAllowed { .. }, Some(keeper)) =
                 (&error, api.keeper.as_ref())
             {

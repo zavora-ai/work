@@ -177,6 +177,37 @@ export function useDelivered() {
   return items;
 }
 
+/* ------------------------------------------------------- how each specialist is doing */
+
+export interface Standing {
+  id: string;
+  finished: Figure;
+  typicalWait: Figure;
+  keptAsIs: Figure;
+  learned: Figure;
+}
+
+export function useStandings() {
+  const [standings, setStandings] = useState<Record<string, Standing>>({});
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const answer = (await bridge()?.standings?.()) as
+          | { specialists?: Standing[] }
+          | undefined;
+        const byId: Record<string, Standing> = {};
+        for (const one of answer?.specialists ?? []) byId[one.id] = one;
+        setStandings(byId);
+      } catch {
+        setStandings({});
+      }
+    })();
+  }, []);
+
+  return standings;
+}
+
 /* ------------------------------------------------------------------ figures */
 
 /** A figure, or the honest absence of one. */

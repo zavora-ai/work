@@ -37,6 +37,14 @@ impl Figure {
         }
     }
 
+    /// A figure that was measured, already in words.
+    pub fn plain(value: impl Into<String>) -> Self {
+        Self {
+            value: value.into(),
+            known: true,
+        }
+    }
+
     /// Not measured. The interface shows the dash and may explain why.
     pub fn unavailable() -> Self {
         Self {

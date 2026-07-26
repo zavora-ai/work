@@ -456,6 +456,36 @@ impl Keeper {
         }
     }
 
+    /// Record that a specialist did a piece of work, and how long the User waited for it.
+    ///
+    /// Without this every per-specialist figure has to be invented, which is how "Typical wait
+    /// 4.1s" came to sit on a settings screen having never been measured.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn record_run(
+        &self,
+        thread: &str,
+        specialist: &str,
+        waited: std::time::Duration,
+        ok: bool,
+    ) {
+        let Ok(store) = self.store.lock() else { return };
+        let started = crate::trays::seconds_now() - waited.as_secs() as i64;
+        if let Err(error) = store.conn().execute(
+            "INSERT INTO job_runs
+               (id, job_id, mode, started_at, finished_at, outcome, specialist)
+             VALUES (?1, ?2, 'manual', ?3, unixepoch(), ?4, ?5)",
+            rusqlite::params![
+                new_id("run"),
+                thread,
+                started,
+                if ok { "completed" } else { "failed_user" },
+                specialist
+            ],
+        ) {
+            eprintln!("[core] this run was not recorded: {error}");
+        }
+    }
+
     /// Record that work reached the User.
     ///
     /// A file saved into their folder is the one delivery Work Studio can make today, and it is
@@ -483,6 +513,12 @@ impl Keeper {
         ) {
             eprintln!("[core] this delivery was not recorded: {error}");
         }
+    }
+
+    /// How each specialist is doing.
+    pub fn standings(&self) -> Result<Vec<crate::standings::Standing>, String> {
+        let store = self.store.lock().map_err(|_| "the store was left locked")?;
+        crate::standings::standings(&store)
     }
 
     /// What is waiting on the User.

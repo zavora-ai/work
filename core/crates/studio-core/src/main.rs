@@ -11,6 +11,7 @@ mod api;
 mod capabilities;
 mod keeper;
 mod overview;
+mod standings;
 mod trays;
 
 use studio_jobs::{Job, JobKind, JobState};

@@ -24,6 +24,8 @@
 
 import { useState } from "react";
 
+import { useStandings } from "../useOwn.ts";
+
 import {
   AGENTS,
   approvalRate,
@@ -51,6 +53,7 @@ import { AgentReach } from "./CapabilitiesPane.tsx";
 export function AgentsSettings() {
   const [openId, setOpenId] = useState<string | undefined>();
   const open = AGENTS.find((agent) => agent.id === openId);
+  const standings = useStandings();
 
   if (open) {
     return <AgentDetail agent={open} onBack={() => setOpenId(undefined)} />;
@@ -86,10 +89,24 @@ export function AgentsSettings() {
               <div className="title">{agent.name}</div>
               <div className="sub">{agent.does}</div>
             </div>
-            <Figure label="Accepted as-is" value={`${approvalRate(agent.outcomes)}%`} />
-            <Sparkline values={agent.trend} />
-            <Figure label="Typical wait" value={agent.latencyP50} />
-            <Figure label="A day" value={agent.costPerDay} />
+            {/* Measured, or absent. These read "72%", "4.1s" and "$0.08" for every
+                specialist before anything had run — three numbers that looked like evidence
+                and were written by hand. A dash is the honest version. */}
+            <Figure
+              label="Work done"
+              value={standings[agent.id]?.finished.value ?? "—"}
+              known={standings[agent.id]?.finished.known ?? false}
+            />
+            <Figure
+              label="Typical wait"
+              value={standings[agent.id]?.typicalWait.value ?? "—"}
+              known={standings[agent.id]?.typicalWait.known ?? false}
+            />
+            <Figure
+              label="Kept as it was"
+              value={standings[agent.id]?.keptAsIs.value ?? "—"}
+              known={standings[agent.id]?.keptAsIs.known ?? false}
+            />
             <Icon name="chevronRight" size={15} stroke="var(--faint)" />
           </button>
         ))}
@@ -352,11 +369,28 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Figure({ label, value }: { label: string; value: string }) {
+function Figure({
+  label,
+  value,
+  known = true,
+}: {
+  label: string;
+  value: string;
+  /** False when nothing has been measured yet, so it is drawn quietly. */
+  known?: boolean;
+}) {
   return (
     <div style={{ textAlign: "right", minWidth: 74 }}>
       <div style={{ fontSize: 10.5, color: "var(--faint)" }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 640 }}>{value}</div>
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 640,
+          color: known ? undefined : "var(--faint)",
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }
