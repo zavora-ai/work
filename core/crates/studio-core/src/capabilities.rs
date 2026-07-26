@@ -149,6 +149,10 @@ impl<'a> Capabilities<'a> {
                 return Err(format!("there is no {agent} specialist"));
             }
         }
+        // Acting on a connection that is not there must fail rather than report success. The
+        // DELETE and the INSERTs below both match zero rows for an unknown id, so without this
+        // the caller is told the allocation was changed and nothing was.
+        self.must_exist(id)?;
         let conn = self.store.conn();
         conn.execute(
             "DELETE FROM capability_agents WHERE capability_id = ?1",
@@ -161,6 +165,23 @@ impl<'a> Capabilities<'a> {
                 rusqlite::params![id, agent],
             )
             .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    /// Refuse quietly-wrong work: an id nobody has is an error, not a no-op.
+    fn must_exist(&self, id: &str) -> Result<(), String> {
+        let found: i64 = self
+            .store
+            .conn()
+            .query_row(
+                "SELECT count(*) FROM capabilities WHERE id = ?1",
+                [id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        if found == 0 {
+            return Err(format!("there is no {id} connection"));
         }
         Ok(())
     }
@@ -542,5 +563,19 @@ mod tests {
         assert!(!command_present("definitely-not-a-real-command-xyz"));
         assert!(command_present("/bin/sh"));
         assert!(!command_present("/bin/definitely-not-here"));
+    }
+
+    /// The reason this exists: `allocate` on an unknown id matched zero rows in every statement
+    /// and returned Ok, so the interface was told a change had been made that had not.
+    #[test]
+    fn acting_on_a_connection_that_is_not_there_is_refused() {
+        let mut store = Store::open_in_memory().unwrap();
+        store.migrate().unwrap();
+        let capabilities = Capabilities::new(&store);
+
+        let error = capabilities
+            .allocate("spreadsheet", &["spreadsheet".to_string()])
+            .expect_err("a singular id nobody has must not report success");
+        assert!(error.contains("no spreadsheet connection"), "{error}");
     }
 }

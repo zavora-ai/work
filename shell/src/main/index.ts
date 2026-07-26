@@ -150,6 +150,12 @@ app.whenReady().then(async () => {
     return result.filePaths[0];
   });
 
+  ipcMain.handle("core:tray", () => coreFetch("/tray"));
+  ipcMain.handle("core:trayAct", (_event, decision: unknown) =>
+    corePost("/tray/act", decision),
+  );
+  ipcMain.handle("core:deliveries", () => coreFetch("/deliveries"));
+
   ipcMain.handle("core:overview", () => coreFetch("/overview"));
   ipcMain.handle("core:activity", () => coreFetch("/activity"));
 

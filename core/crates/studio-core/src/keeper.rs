@@ -456,6 +456,77 @@ impl Keeper {
         }
     }
 
+    /// Record that work reached the User.
+    ///
+    /// A file saved into their folder is the one delivery Work Studio can make today, and it is
+    /// a real one: it changed something outside the app that they will see. It is reversible for
+    /// as long as the change log can undo it, which is why it carries a window rather than
+    /// claiming to be final.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn delivered_to_folder(&self, thread: &str, path: &str, summary: &str) {
+        let Ok(store) = self.store.lock() else { return };
+        let folder = std::path::Path::new(path)
+            .parent()
+            .map(|p| {
+                p.file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| p.to_string_lossy().into_owned())
+            })
+            .unwrap_or_else(|| "your folder".to_string());
+        if let Err(error) = crate::trays::record_delivery(
+            &store,
+            thread,
+            summary,
+            &folder,
+            // Ten minutes, matching how long the interface offers to undo it.
+            Some(600),
+        ) {
+            eprintln!("[core] this delivery was not recorded: {error}");
+        }
+    }
+
+    /// What is waiting on the User.
+    pub fn waiting(&self) -> Result<Vec<crate::trays::Waiting>, String> {
+        let store = self.store.lock().map_err(|_| "the store was left locked")?;
+        crate::trays::waiting(&store)
+    }
+
+    /// What the User decided about one of them.
+    pub fn decide(&self, decision: &crate::trays::Decision) -> Result<(), String> {
+        let store = self.store.lock().map_err(|_| "the store was left locked")?;
+        crate::trays::decide(&store, decision)
+    }
+
+    /// What has gone out.
+    pub fn delivered(&self) -> Result<Vec<crate::trays::Delivered>, String> {
+        let store = self.store.lock().map_err(|_| "the store was left locked")?;
+        crate::trays::delivered(&store)
+    }
+
+    /// Put something in front of the User, with the actions they can take.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn needs_you(
+        &self,
+        thread: &str,
+        headline: &str,
+        detail: &str,
+        choices: Vec<String>,
+        dedupe_on: Option<&str>,
+    ) {
+        let Ok(store) = self.store.lock() else { return };
+        if let Err(detail) = crate::trays::add(
+            &store,
+            thread,
+            studio_tray::TrayClass::Escalation,
+            headline,
+            detail,
+            choices,
+            dedupe_on,
+        ) {
+            eprintln!("[core] this did not reach the tray: {detail}");
+        }
+    }
+
     /// The figures the Dashboard shows.
     pub fn overview(&self) -> Result<crate::overview::Overview, String> {
         let store = self.store.lock().map_err(|_| "the store was left locked")?;

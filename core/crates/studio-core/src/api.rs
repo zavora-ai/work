@@ -284,6 +284,9 @@ pub fn router(api: Arc<Api>) -> Router {
         .route("/capabilities/act", axum::routing::post(act_on_capability))
         // What the Dashboard says, and what the diagnostics view shows.
         .route("/overview", get(overview))
+        .route("/tray", get(tray))
+        .route("/tray/act", axum::routing::post(decide_tray))
+        .route("/deliveries", get(deliveries))
         .route("/activity", get(activity))
         .with_state(api)
 }
@@ -565,6 +568,50 @@ async fn thread(
     }
 }
 
+/// What is waiting on the User.
+async fn tray(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match api.keeper.as_ref().map(|k| k.waiting()) {
+        Some(Ok(items)) => Json(serde_json::json!({ "items": items })).into_response(),
+        Some(Err(detail)) => problem("Work Studio could not read the tray".into(), Some(&detail)),
+        None => Json(serde_json::json!({ "items": [] })).into_response(),
+    }
+}
+
+/// What the User decided about one of them.
+async fn decide_tray(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(decision): Json<crate::trays::Decision>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match api.keeper.as_ref().map(|k| k.decide(&decision)) {
+        Some(Ok(())) => Json(serde_json::json!({ "done": true })).into_response(),
+        // Resolving twice lands here, and saying so is better than pretending it worked.
+        Some(Err(detail)) => problem("That has already been dealt with".into(), Some(&detail)),
+        None => problem("Nothing is being kept this session".into(), None),
+    }
+}
+
+/// What has gone out.
+async fn deliveries(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match api.keeper.as_ref().map(|k| k.delivered()) {
+        Some(Ok(items)) => Json(serde_json::json!({ "items": items })).into_response(),
+        Some(Err(detail)) => problem(
+            "Work Studio could not read what went out".into(),
+            Some(&detail),
+        ),
+        None => Json(serde_json::json!({ "items": [] })).into_response(),
+    }
+}
+
 /// The figures on the Dashboard, counted rather than invented.
 async fn overview(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
     if !api.authorised(&headers) {
@@ -755,6 +802,10 @@ async fn ask(
         let _ = keeper.remember_turn(&thread, "you", &asked.asked);
     }
 
+    // Kept because the request is consumed below and the history entry should read as what the
+    // User asked for, not as what the specialist replied.
+    let in_their_words = first_sentence(&asked.asked);
+
     let request = studio_runner::pipeline::Request {
         asked: asked.asked,
         artefact: std::path::PathBuf::from(&asked.path),
@@ -815,7 +866,24 @@ async fn ask(
             keeper.record_spend(&thread, micros);
         }
         if outcome.saved {
-            keeper.record_change(&asked.path, &first_sentence(&outcome.said), false);
+            // The User's own words, not the specialist's reply. A reply is often "Done." —
+            // true, and useless in a list of what happened. What they asked for is what they
+            // will recognise a week later.
+            keeper.record_change(&asked.path, &in_their_words, false);
+            keeper.delivered_to_folder(&thread, &asked.path, &in_their_words);
+        }
+        // A refusal is a thing waiting on the User, not a line in a log they never read. One
+        // item per cause, so the same wall hit four times is one decision.
+        for refusal in &outcome.refused {
+            keeper.needs_you(
+                &thread,
+                "I was not allowed to do part of that",
+                &format!(
+                    "This is switched off for now: {refusal}. You can change that in Settings."
+                ),
+                vec!["Allow it".to_string(), "Leave it".to_string()],
+                Some(&format!("refused:{refusal}")),
+            );
         }
         keeper.log(
             "action",
@@ -838,6 +906,20 @@ async fn ask(
         Err(error) => {
             if let Some(detail) = error.detail() {
                 tracing_detail(detail);
+            }
+            // Something the User switched off is a decision waiting on them, not a fault to
+            // report and forget. It goes in the tray with the way to undo it, deduped on the
+            // cause so asking five times leaves one item.
+            if let (studio_runner::pipeline::RunError::NotAllowed { .. }, Some(keeper)) =
+                (&error, api.keeper.as_ref())
+            {
+                keeper.needs_you(
+                    &thread,
+                    "I could not work on that file",
+                    "You have switched this off for now. You can turn it back on in Settings.",
+                    vec!["Turn it back on".to_string(), "Leave it off".to_string()],
+                    Some("switched-off"),
+                );
             }
             (
                 StatusCode::UNPROCESSABLE_ENTITY,

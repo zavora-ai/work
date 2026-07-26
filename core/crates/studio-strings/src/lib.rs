@@ -118,6 +118,9 @@ pub const CATALOGUE: &[Entry] = &[
     // ---- documents ----
     p("new.open_a_file", "Open a file"),
     p("dash.not_measured", "not measured"),
+    p("tray.dismiss", "Dismiss"),
+    p("out.cannot_undo", "cannot be undone"),
+    p("out.already_undone", "undone"),
     d("diag.nothing_yet", "Nothing recorded yet."),
     s("caps.title", "What each specialist can reach"),
     s(

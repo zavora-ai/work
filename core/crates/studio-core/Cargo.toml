@@ -26,6 +26,7 @@ studio-jobs.workspace = true
 studio-runner = { workspace = true, optional = true }
 adk-model = { path = "../../../../adk-rust/adk-model", optional = true, default-features = false, features = ["openai"] }
 studio-router.workspace = true
+studio-tray.workspace = true
 studio-sheets.workspace = true
 studio-store.workspace = true
 studio-strings.workspace = true

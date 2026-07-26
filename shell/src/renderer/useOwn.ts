@@ -109,6 +109,74 @@ export function useThreads(changedAt?: number) {
   return { threads, reload };
 }
 
+/* ------------------------------------------------------- waiting, and what went out */
+
+export interface Waiting {
+  id: string;
+  about: string;
+  /** kickoff, escalation, finding or attention. */
+  sort: string;
+  headline: string;
+  detail: string;
+  choices: string[];
+}
+
+export function useWaiting() {
+  const [items, setItems] = useState<Waiting[]>([]);
+  const [changedAt, setChangedAt] = useState(0);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const answer = (await bridge()?.tray?.()) as { items?: Waiting[] } | undefined;
+        setItems(answer?.items ?? []);
+      } catch {
+        setItems([]);
+      }
+    })();
+  }, [changedAt]);
+
+  /** Answer one of them. The tray refuses a second answer, so the list is refetched either way. */
+  const decide = async (id: string, answer: string) => {
+    try {
+      await bridge()?.trayAct?.({ id, answer });
+    } finally {
+      setChangedAt(Date.now());
+    }
+  };
+
+  // Exposed so the figures can be recounted after a decision: "Waiting on you 1" above an
+  // empty list is the kind of small lie that makes a User stop believing the numbers.
+  return { items, decide, changedAt };
+}
+
+export interface Delivered {
+  id: string;
+  what: string;
+  whereTo: string;
+  when: number;
+  reversible: boolean;
+  reversibleUntil?: number;
+  reversed: boolean;
+}
+
+export function useDelivered() {
+  const [items, setItems] = useState<Delivered[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const answer = (await bridge()?.deliveries?.()) as { items?: Delivered[] } | undefined;
+        setItems(answer?.items ?? []);
+      } catch {
+        setItems([]);
+      }
+    })();
+  }, []);
+
+  return items;
+}
+
 /* ------------------------------------------------------------------ figures */
 
 /** A figure, or the honest absence of one. */

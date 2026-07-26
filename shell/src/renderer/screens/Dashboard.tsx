@@ -7,8 +7,8 @@
  */
 
 import { t } from "../../shared/strings.ts";
-import { DELIVERIES, THREADS, TRAY } from "../fixtures.ts";
-import { useOverview } from "../useOwn.ts";
+import { THREADS } from "../fixtures.ts";
+import { useDelivered, useOverview, useWaiting } from "../useOwn.ts";
 import { Button, Card, Pill } from "../components/primitives.tsx";
 import { TrayRow } from "../components/state.tsx";
 import type { Route } from "../routes.ts";
@@ -18,9 +18,14 @@ export function Dashboard({
 }: {
   onNavigate: (route: Route, threadId?: string) => void;
 }) {
-  const overview = useOverview();
-  const waiting = TRAY.slice(0, 3);
-  const done = DELIVERIES.slice(0, 3);
+
+  // The three most pressing of each, from the store. Empty is a real answer here: a quiet
+  // Dashboard means nothing needs the User, which is the point of the product.
+  const { items, decide, changedAt } = useWaiting();
+  const delivered = useDelivered();
+  const overview = useOverview(changedAt);
+  const waiting = items.slice(0, 3);
+  const done = delivered.slice(0, 3);
   const scheduled = THREADS.filter((thread) =>
     ["scheduled", "needsYou", "working"].includes(thread.badge),
   ).slice(0, 3);
@@ -67,16 +72,22 @@ export function Dashboard({
             {waiting.map((item) => (
               <TrayRow
                 key={item.id}
-                cls={item.cls}
+                cls={item.sort as "kickoff" | "escalation" | "finding" | "attention"}
                 headline={item.headline}
                 detail={item.detail}
                 actions={
                   <Button
-                    onClick={() =>
-                      onNavigate(item.cls === "kickoff" ? "kickoffOutput" : "tray")
-                    }
+                    onClick={() => {
+                      if (item.sort === "kickoff") {
+                        onNavigate("kickoffOutput");
+                        return;
+                      }
+                      // Answering here resolves it here. Sending the User to another screen to
+                      // press the same button again is a step that exists for the code's sake.
+                      void decide(item.id, item.choices[0] ?? "dismiss");
+                    }}
                   >
-                    {item.choices[0]}
+                    {item.choices[0] ?? t("tray.dismiss")}
                   </Button>
                 }
               />
@@ -91,15 +102,20 @@ export function Dashboard({
               <Card key={delivery.id}>
                 <div className="row">
                   <div>
-                    <div className="title">{delivery.action}</div>
+                    <div className="title">{delivery.what}</div>
                     <div className="sub">
-                      {delivery.when} · {delivery.thread}
-                      {delivery.extra ? ` · ${delivery.extra}` : ""}
+                      {new Date(delivery.when * 1000).toLocaleString([], {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}{" "}
+                      · {delivery.whereTo}
                     </div>
                   </div>
-                  {delivery.reversal.kind === "available" ? (
+                  {delivery.reversible && !delivery.reversed ? (
                     <Button small style={{ marginLeft: "auto" }}>
-                      {delivery.reversal.label}
+                      {t("out.undo")}
                     </Button>
                   ) : null}
                 </div>

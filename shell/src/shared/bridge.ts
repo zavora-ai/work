@@ -43,6 +43,13 @@ export interface StudioBridge {
    * Answers when the work is finished. Progress arrives on the event stream in the
    * meantime, because the work takes long enough that silence would read as a hang.
    */
+  /** What is waiting on the User. */
+  tray(): Promise<unknown>;
+  /** What the User decided about one of those things. */
+  trayAct(decision: { id: string; answer: string }): Promise<unknown>;
+  /** What has gone out. */
+  deliveries(): Promise<unknown>;
+
   /** The figures the Dashboard shows, counted rather than invented. */
   overview(): Promise<unknown>;
   /** What has happened, for the diagnostics view. */

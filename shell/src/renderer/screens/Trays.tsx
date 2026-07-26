@@ -9,12 +9,11 @@
 import { useState } from "react";
 
 import { t } from "../../shared/strings.ts";
+import { useDelivered, useWaiting } from "../useOwn.ts";
 import {
-  DELIVERIES,
   RUN_HISTORY,
   THREADS,
   THREAD_NOTES,
-  TRAY,
   type Thread,
 } from "../fixtures.ts";
 import { Button, Card, Field, Pill } from "../components/primitives.tsx";
@@ -23,10 +22,12 @@ import { TrayRow } from "../components/state.tsx";
 import type { Route } from "../routes.ts";
 
 export function InTray({ onNavigate }: { onNavigate: (route: Route) => void }) {
+  const { items, decide } = useWaiting();
+
   return (
     <main className="main">
       <h1 className="h1">{t("tray.heading")}</h1>
-      {TRAY.length === 0 ? (
+      {items.length === 0 ? (
         <Empty
           icon="check"
           title={t("dash.nothing_waiting")}
@@ -34,24 +35,30 @@ export function InTray({ onNavigate }: { onNavigate: (route: Route) => void }) {
         />
       ) : null}
       <div className="stack">
-        {TRAY.map((item) => (
+        {/* Real items from the tray. A refusal a specialist ran into is here with the
+            actions that resolve it — and answering removes it, because the tray refuses a
+            second answer rather than letting one decision be made twice. */}
+        {items.map((item) => (
           <TrayRow
             key={item.id}
-            cls={item.cls}
+            cls={item.sort as "kickoff" | "escalation" | "finding" | "attention"}
             headline={item.headline}
             detail={item.detail}
-            actions={item.choices.map((choice, index) => (
-              <Button
-                key={choice}
-                small={item.choices.length > 1}
-                onClick={() =>
-                  onNavigate(item.cls === "kickoff" ? "kickoffOutput" : "tray")
-                }
-                primary={index === 0 && item.choices.length === 1 && item.cls === "attention"}
-              >
-                {choice}
-              </Button>
-            ))}
+            actions={(item.choices.length > 0 ? item.choices : ["Dismiss"]).map(
+              (choice, index) => (
+                <Button
+                  key={choice}
+                  small={item.choices.length > 1}
+                  onClick={() => {
+                    void decide(item.id, choice === "Dismiss" ? "dismiss" : choice);
+                    if (item.sort === "kickoff") onNavigate("kickoffOutput");
+                  }}
+                  primary={index === 0 && item.choices.length === 1 && item.sort === "attention"}
+                >
+                  {choice}
+                </Button>
+              ),
+            )}
           />
         ))}
       </div>
@@ -63,12 +70,13 @@ export function InTray({ onNavigate }: { onNavigate: (route: Route) => void }) {
 }
 
 export function OutTray() {
-  const [steering, setSteering] = useState<string | undefined>("d-1");
+  const [steering, setSteering] = useState<string | undefined>(undefined);
+  const delivered = useDelivered();
 
   return (
     <main className="main">
       <h1 className="h1">{t("out.heading")}</h1>
-      {DELIVERIES.length === 0 ? (
+      {delivered.length === 0 ? (
         <Empty
           icon="bolt"
           title="Nothing has been done yet"
@@ -76,22 +84,33 @@ export function OutTray() {
         />
       ) : null}
       <div className="stack">
-        {DELIVERIES.map((delivery) => (
+        {delivered.map((delivery) => (
           <Card key={delivery.id}>
             <div className="row">
               <div style={{ minWidth: 0 }}>
-                <div className="title">{delivery.action}</div>
+                <div className="title">{delivery.what}</div>
                 <div className="sub">
-                  {delivery.when} · {delivery.thread}
-                  {delivery.extra ? ` · ${delivery.extra}` : ""}
+                  {new Date(delivery.when * 1000).toLocaleString([], {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}{" "}
+                  · {delivery.whereTo}
                 </div>
               </div>
               <div className="ml" style={{ display: "flex", gap: 7, alignItems: "center" }}>
-                {delivery.reversal.kind === "available" ? (
-                  <Button small>{delivery.reversal.label}</Button>
+                {/* An undo is offered only where one exists. The schema will not let a
+                    delivery claim a window it does not have, so this cannot over-promise. */}
+                {delivery.reversed ? (
+                  <span style={{ fontSize: 12, color: "var(--faint)" }}>
+                    {t("out.already_undone")}
+                  </span>
+                ) : delivery.reversible ? (
+                  <Button small>{t("out.undo")}</Button>
                 ) : (
                   <span style={{ fontSize: 12, color: "var(--faint)" }}>
-                    {delivery.reversal.reason}
+                    {t("out.cannot_undo")}
                   </span>
                 )}
                 <Button small onClick={() => setSteering(delivery.id)}>

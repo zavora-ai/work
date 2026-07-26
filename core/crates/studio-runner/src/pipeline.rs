@@ -31,6 +31,10 @@ pub enum RunError {
     UnknownKind,
     #[error("Work Studio could not start what it needs to edit this file")]
     ServerUnavailable { detail: String },
+    /// Distinct from the above on purpose. "Could not start" says the app is broken; this says
+    /// the User turned it off, which is true, actionable, and not a fault.
+    #[error("You have switched this off for now")]
+    NotAllowed { detail: String },
     #[error("Work Studio could not finish that")]
     Failed { detail: String },
 }
@@ -41,6 +45,7 @@ impl RunError {
         match self {
             Self::ModelUnusable { detail }
             | Self::ServerUnavailable { detail }
+            | Self::NotAllowed { detail }
             | Self::Failed { detail } => Some(detail),
             _ => None,
         }
@@ -503,7 +508,7 @@ impl Engine {
             .unwrap_or_default();
         match allocated.first() {
             Some(first) => Ok(std::path::PathBuf::from(&first.command)),
-            None if self.provides.is_some() => Err(RunError::ServerUnavailable {
+            None if self.provides.is_some() => Err(RunError::NotAllowed {
                 detail: format!(
                     "the {} specialist has not been allowed anything it can use",
                     kind.specialist_name()
@@ -547,7 +552,7 @@ impl Engine {
         let binary: std::path::PathBuf = match allocated.first() {
             Some(first) => std::path::PathBuf::from(&first.command),
             None if self.provides.is_some() => {
-                return Err(RunError::ServerUnavailable {
+                return Err(RunError::NotAllowed {
                     detail: format!(
                         "the {} specialist has not been allowed anything it can use",
                         kind.specialist_name()

@@ -2946,6 +2946,7 @@ dependencies = [
  "studio-steering",
  "studio-store",
  "studio-strings",
+ "studio-tray",
  "thiserror 2.0.19",
  "tokio",
  "tower",
