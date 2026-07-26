@@ -7,7 +7,8 @@
  */
 
 import { t } from "../../shared/strings.ts";
-import { DELIVERIES, METRICS, THREADS, TRAY } from "../fixtures.ts";
+import { DELIVERIES, THREADS, TRAY } from "../fixtures.ts";
+import { useOverview } from "../useOwn.ts";
 import { Button, Card, Pill } from "../components/primitives.tsx";
 import { TrayRow } from "../components/state.tsx";
 import type { Route } from "../routes.ts";
@@ -17,6 +18,7 @@ export function Dashboard({
 }: {
   onNavigate: (route: Route, threadId?: string) => void;
 }) {
+  const overview = useOverview();
   const waiting = TRAY.slice(0, 3);
   const done = DELIVERIES.slice(0, 3);
   const scheduled = THREADS.filter((thread) =>
@@ -33,10 +35,29 @@ export function Dashboard({
           marginBottom: 22,
         }}
       >
-        <Metric label={t("dash.metric.working")} value={METRICS.working} />
-        <Metric label={t("dash.metric.waiting")} value={METRICS.waiting} />
-        <Metric label={t("dash.metric.done")} value={METRICS.done} />
-        <Metric label={t("dash.metric.cost")} value={METRICS.cost} />
+        {/* Counted, not invented. A figure Work Studio cannot answer shows a dash and is
+            marked unknown, because zero is a claim that nothing happened. */}
+        <Metric
+          label={t("dash.metric.working")}
+          value={overview.working.value}
+          known={overview.working.known}
+        />
+        <Metric
+          label={t("dash.metric.waiting")}
+          value={overview.waiting.value}
+          known={overview.waiting.known}
+        />
+        <Metric
+          label={t("dash.metric.done")}
+          value={overview.done.value}
+          known={overview.done.known}
+        />
+        <Metric
+          label={t("dash.metric.cost")}
+          value={overview.cost.value}
+          known={overview.cost.known}
+          note={overview.note}
+        />
       </div>
 
       <div className="cols">
@@ -147,7 +168,18 @@ export function Dashboard({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  value,
+  known = true,
+  note,
+}: {
+  label: string;
+  value: string;
+  /** False when this was not measured. Shown differently, so it cannot read as a count. */
+  known?: boolean;
+  note?: string;
+}) {
   return (
     <div
       style={{
@@ -156,13 +188,29 @@ function Metric({ label, value }: { label: string; value: string }) {
         borderRadius: "var(--radius)",
         padding: "13px 15px",
       }}
+      title={known ? undefined : note}
     >
       <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.3, minHeight: 31 }}>
         {label}
       </div>
-      <div style={{ fontSize: 25, fontWeight: 640, letterSpacing: "-.02em", marginTop: 2 }}>
+      <div
+        style={{
+          fontSize: 25,
+          fontWeight: 640,
+          letterSpacing: "-.02em",
+          marginTop: 2,
+          // A figure nobody measured is drawn quietly, so it does not sit on the screen with
+          // the same authority as one that was counted.
+          color: known ? undefined : "var(--faint)",
+        }}
+      >
         {value}
       </div>
+      {known ? null : (
+        <div style={{ fontSize: 10.5, color: "var(--faint)", marginTop: 2 }}>
+          {t("dash.not_measured")}
+        </div>
+      )}
     </div>
   );
 }

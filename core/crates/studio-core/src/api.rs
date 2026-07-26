@@ -282,6 +282,9 @@ pub fn router(api: Arc<Api>) -> Router {
         // What each specialist may reach, and which of those are on.
         .route("/capabilities", get(capabilities).post(add_capability))
         .route("/capabilities/act", axum::routing::post(act_on_capability))
+        // What the Dashboard says, and what the diagnostics view shows.
+        .route("/overview", get(overview))
+        .route("/activity", get(activity))
         .with_state(api)
 }
 
@@ -492,6 +495,11 @@ async fn edit(
     {
         Ok(()) => {
             if let Some(keeper) = api.keeper.as_ref() {
+                keeper.record_change(
+                    &body.path,
+                    &format!("you changed {} at {}", body.cell, body.sheet),
+                    true,
+                );
                 keeper.log(
                     "action",
                     &format!("you changed {} at {}", body.cell, body.sheet),
@@ -554,6 +562,42 @@ async fn thread(
         (Err(detail), _) | (_, Err(detail)) => {
             problem("Work Studio could not read that work".into(), Some(&detail))
         }
+    }
+}
+
+/// The figures on the Dashboard, counted rather than invented.
+async fn overview(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match api.keeper.as_ref().map(|k| k.overview()) {
+        Some(Ok(view)) => Json(view).into_response(),
+        Some(Err(detail)) => problem("Work Studio could not count that up".into(), Some(&detail)),
+        // Nothing is being kept, so nothing can be counted. Said as unavailable rather than
+        // as a row of zeros.
+        None => Json(serde_json::json!({
+            "working": { "value": "—", "known": false },
+            "waiting": { "value": "—", "known": false },
+            "done": { "value": "—", "known": false },
+            "cost": { "value": "—", "known": false },
+            "note": "Nothing is being kept this session."
+        }))
+        .into_response(),
+    }
+}
+
+/// What has happened. The diagnostics view shows this, and it may hold technical detail.
+async fn activity(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match api.keeper.as_ref().map(|k| k.activity(60)) {
+        Some(Ok(entries)) => Json(serde_json::json!({ "entries": entries })).into_response(),
+        Some(Err(detail)) => problem(
+            "Work Studio could not read its own record".into(),
+            Some(&detail),
+        ),
+        None => Json(serde_json::json!({ "entries": [] })).into_response(),
     }
 }
 
@@ -626,6 +670,26 @@ fn problem(message: String, detail: Option<&str>) -> axum::response::Response {
         Json(serde_json::json!({ "problem": message })),
     )
         .into_response()
+}
+
+/// The first sentence of what was said, which is what a history entry should read like.
+#[cfg(feature = "adk")]
+fn first_sentence(said: &str) -> String {
+    let trimmed = said.trim();
+    let end = trimmed
+        .find(". ")
+        .map(|i| i + 1)
+        .unwrap_or_else(|| trimmed.len().min(120));
+    trimmed[..end].trim().to_string()
+}
+
+/// Which model the balanced tier resolves to, for pricing what a run cost.
+#[cfg(feature = "adk")]
+fn model_name() -> Option<String> {
+    studio_router::Policy::openai_default()
+        .chain_for(studio_router::QualityTier::Balanced)
+        .first()
+        .map(|reference| reference.model.clone())
 }
 
 /// What the User typed, and about which file.
@@ -729,6 +793,29 @@ async fn ask(
     if let (Some(keeper), Ok(outcome)) = (api.keeper.as_ref(), outcome.as_ref()) {
         if !outcome.said.is_empty() {
             let _ = keeper.remember_turn(&thread, "studio", &outcome.said);
+        }
+        // What it cost, as the provider counted it. Recorded so the Dashboard can show a real
+        // figure instead of an invented one.
+        if !outcome.usage.is_empty() {
+            // Priced from ADK-Rust's own table rather than a rate written here. Rates move,
+            // and a number compiled into this file would quietly become wrong.
+            let micros = model_name()
+                .as_deref()
+                .and_then(adk_model::openai::pricing::lookup_pricing)
+                .map(|pricing| {
+                    let cost = adk_model::openai::pricing::estimate_cost(
+                        pricing,
+                        outcome.usage.prompt_tokens as u64,
+                        outcome.usage.answer_tokens as u64,
+                        0,
+                    );
+                    ((cost.input_cost + cost.output_cost + cost.cache_cost) * 1_000_000.0) as i64
+                })
+                .unwrap_or(0);
+            keeper.record_spend(&thread, micros);
+        }
+        if outcome.saved {
+            keeper.record_change(&asked.path, &first_sentence(&outcome.said), false);
         }
         keeper.log(
             "action",

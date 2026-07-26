@@ -16,6 +16,7 @@
  */
 
 import { t } from "../../shared/strings.ts";
+import { useActivity } from "../useOwn.ts";
 import { AGENTS } from "../agentFixtures.ts";
 import { Button, Icon } from "../components/primitives.tsx";
 
@@ -76,6 +77,7 @@ const BUILD = [
 ];
 
 export function Diagnostics() {
+  const entries = useActivity();
   return (
     <main className="main">
       <h1 className="h1">{t("diag.title")}</h1>
@@ -106,9 +108,17 @@ export function Diagnostics() {
       </Section>
 
       <Section label={t("diag.recent")}>
-        {ACTIVITY.map((entry) => (
+        {/* The real record, newest first. It was a fixture list while an append-only
+            activity_log sat unused. This surface may hold technical detail — it is the one
+            place the vocabulary rule exempts, because support needs the cause. */}
+        {entries.length === 0 ? (
+          <p style={{ fontSize: 12, color: "var(--muted)", margin: "6px 0" }}>
+            {t("diag.nothing_yet")}
+          </p>
+        ) : null}
+        {entries.map((entry) => (
           <div
-            key={entry.when + entry.what}
+            key={entry.seq}
             style={{
               display: "flex",
               gap: 12,
@@ -126,7 +136,10 @@ export function Diagnostics() {
                 minWidth: 62,
               }}
             >
-              {entry.when}
+              {new Date(entry.when * 1000).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
@@ -136,21 +149,12 @@ export function Diagnostics() {
                   color: "#3d3933",
                 }}
               >
-                {entry.what}
+                {entry.category}
               </div>
               <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 2 }}>
                 {entry.detail}
               </div>
             </div>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 650,
-                color: OUTCOME[entry.outcome].colour,
-              }}
-            >
-              {OUTCOME[entry.outcome].label}
-            </span>
           </div>
         ))}
       </Section>

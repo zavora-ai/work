@@ -10,6 +10,7 @@
 mod api;
 mod capabilities;
 mod keeper;
+mod overview;
 
 use studio_jobs::{Job, JobKind, JobState};
 use studio_store::Store;

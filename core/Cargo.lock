@@ -2930,6 +2930,7 @@ dependencies = [
 name = "studio-core"
 version = "0.1.0"
 dependencies = [
+ "adk-model",
  "axum",
  "rusqlite",
  "serde",

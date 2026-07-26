@@ -426,6 +426,58 @@ impl Keeper {
         Ok(())
     }
 
+    /// Record a change to one of the User's files, whoever made it.
+    ///
+    /// One history for both authors: a cell the User typed and a column a specialist added are
+    /// the same kind of thing (Property 23). Nothing was writing to it, so the change log was
+    /// empty and "Done today" could only ever read zero.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn record_change(&self, path: &str, description: &str, by_user: bool) {
+        let Ok(store) = self.store.lock() else { return };
+        let artefacts = studio_artefacts::Artefacts::new(&store);
+        let file = std::path::Path::new(path);
+        let name = file
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.to_string());
+        // Identify an Artefact by its path, so the same file is the same Artefact next time.
+        let id = format!("art-{:x}", fnv(path));
+
+        if artefacts.get(&id).is_err() && artefacts.register(&id, file, &name, None).is_err() {
+            return;
+        }
+        let edit = if by_user {
+            studio_artefacts::EditOperation::by_user("edit", description)
+        } else {
+            studio_artefacts::EditOperation::by_studio("edit", description)
+        };
+        if let Err(error) = artefacts.record(&id, &edit) {
+            eprintln!("[core] this change was not recorded in the history: {error}");
+        }
+    }
+
+    /// The figures the Dashboard shows.
+    pub fn overview(&self) -> Result<crate::overview::Overview, String> {
+        let store = self.store.lock().map_err(|_| "the store was left locked")?;
+        crate::overview::overview(&store)
+    }
+
+    /// What has happened, newest first.
+    pub fn activity(&self, limit: usize) -> Result<Vec<crate::overview::Entry>, String> {
+        let store = self.store.lock().map_err(|_| "the store was left locked")?;
+        crate::overview::activity(&store, limit)
+    }
+
+    /// Record what a piece of work cost.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn record_spend(&self, thread: &str, micros: i64) {
+        if let Ok(store) = self.store.lock()
+            && let Err(detail) = crate::overview::record_spend(&store, thread, micros)
+        {
+            eprintln!("[core] this spend was not recorded: {detail}");
+        }
+    }
+
     /// Record that something happened, for the diagnostics view.
     ///
     /// A rejected write is reported rather than swallowed. It was swallowed, and so a
@@ -445,6 +497,16 @@ impl Keeper {
 ///
 /// Only this may be replaced by a later, better name.
 pub const PLACEHOLDER_PURPOSE: &str = "Work in progress";
+
+/// A stable identifier for a path. FNV-1a, so the same file is the same Artefact next run.
+fn fnv(text: &str) -> u64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in text.as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
+}
 
 /// The timezone the User is in, as the store requires. Schedules are not part of the
 /// spreadsheet work, so this is recorded rather than used.

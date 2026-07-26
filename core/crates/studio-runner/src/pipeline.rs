@@ -106,6 +106,31 @@ pub fn progress_for(operation: &str) -> Option<&'static str> {
     })
 }
 
+/// What a run cost, as the provider counted it.
+///
+/// Recorded rather than estimated: the figure on the Dashboard is real money, and a plausible
+/// guess there is worse than no figure at all.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Usage {
+    pub prompt_tokens: i64,
+    pub answer_tokens: i64,
+}
+
+impl Usage {
+    /// Millionths of a currency unit, at the given per-million-token rates.
+    ///
+    /// Rates belong to the caller, not here: they change without warning, and a number baked
+    /// into the engine would quietly become wrong.
+    pub fn micros(self, prompt_per_million: i64, answer_per_million: i64) -> i64 {
+        (self.prompt_tokens * prompt_per_million + self.answer_tokens * answer_per_million)
+            / 1_000_000
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.prompt_tokens == 0 && self.answer_tokens == 0
+    }
+}
+
 /// What happened, in terms the interface can show.
 #[derive(Debug, Clone, Default)]
 pub struct Outcome {
@@ -117,6 +142,8 @@ pub struct Outcome {
     pub refused: Vec<String>,
     /// Whether the file on disk was saved.
     pub saved: bool,
+    /// What it cost, as counted by the provider. Empty when nothing reported usage.
+    pub usage: Usage,
 }
 
 /// Everything a run needs that outlives one request.
@@ -689,6 +716,12 @@ impl Engine {
                     });
                 }
             };
+            // Usage arrives on the response, not on a part, and only on some of them.
+            if let Some(usage) = event.llm_response.usage_metadata.as_ref() {
+                outcome.usage.prompt_tokens += usage.prompt_token_count as i64;
+                outcome.usage.answer_tokens += usage.candidates_token_count as i64;
+            }
+
             let Some(content) = event.llm_response.content.as_ref() else {
                 continue;
             };

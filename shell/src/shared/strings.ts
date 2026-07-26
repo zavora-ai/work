@@ -126,6 +126,8 @@ export const CATALOGUE = {
 
   // ---- documents ----
   "new.open_a_file": p("Open a file"),
+  "dash.not_measured": p("not measured"),
+  "diag.nothing_yet": d("Nothing recorded yet."),
   "caps.title": s("What each specialist can reach"),
   "caps.intro": s("Turn one off and nothing will use it. Give one to a specialist and it may use it for your work."),
   "caps.none": s("Nothing yet."),

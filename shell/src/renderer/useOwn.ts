@@ -109,6 +109,75 @@ export function useThreads(changedAt?: number) {
   return { threads, reload };
 }
 
+/* ------------------------------------------------------------------ figures */
+
+/** A figure, or the honest absence of one. */
+export interface Figure {
+  value: string;
+  /** False when Work Studio cannot answer. The interface must not read it as zero. */
+  known: boolean;
+}
+
+export interface Overview {
+  working: Figure;
+  waiting: Figure;
+  done: Figure;
+  cost: Figure;
+  note?: string;
+}
+
+const UNKNOWN: Figure = { value: "—", known: false };
+
+export function useOverview(changedAt?: number) {
+  const [overview, setOverview] = useState<Overview>({
+    working: UNKNOWN,
+    waiting: UNKNOWN,
+    done: UNKNOWN,
+    cost: UNKNOWN,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const answer = (await bridge()?.overview?.()) as Overview | undefined;
+        if (!cancelled && answer?.working) setOverview(answer);
+      } catch {
+        // Leaving the dashes in place is the right answer: we do not know.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [changedAt]);
+
+  return overview;
+}
+
+export interface ActivityEntry {
+  seq: number;
+  when: number;
+  category: string;
+  detail: string;
+}
+
+export function useActivity() {
+  const [entries, setEntries] = useState<ActivityEntry[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const answer = (await bridge()?.activity?.()) as { entries?: ActivityEntry[] } | undefined;
+        setEntries(answer?.entries ?? []);
+      } catch {
+        setEntries([]);
+      }
+    })();
+  }, []);
+
+  return entries;
+}
+
 /* -------------------------------------------------------- what it can reach */
 
 export interface Capability {

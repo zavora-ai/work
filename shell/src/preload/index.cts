@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld("studio", {
   health: () => ipcRenderer.invoke("core:health"),
   events: (since: number) => ipcRenderer.invoke("core:events", since),
   openFile: () => ipcRenderer.invoke("shell:openFile"),
+  overview: () => ipcRenderer.invoke("core:overview"),
+  activity: () => ipcRenderer.invoke("core:activity"),
   capabilities: () => ipcRenderer.invoke("core:capabilities"),
   addCapability: (body: {
     label: string;
