@@ -1,0 +1,126 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  core:
+    name: core
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - name: Formatting
+        run: cd core && cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cd core && cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        run: cd core && cargo test --workspace
+
+      # Requirement 1.2 — the build fails if any User-visible string contains a
+      # prohibited term. This is the guardrail the previous attempt lacked, so it
+      # runs as its own step and its failure is not lost in the test output.
+      - name: Vocabulary guardrail
+        run: cd core && cargo run -q --bin vocab-lint
+
+      # Requirement 3.4 — no non-diagnostic payload reaching the renderer may
+      # carry an agent, model, provider, server or tool identifier.
+      - name: Renderer payload guardrail
+        run: cd core && cargo test -p studio-api
+
+  shell:
+    name: shell
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: shell/package-lock.json
+
+      - name: Install
+        run: cd shell && npm ci
+
+      - name: Typecheck
+        run: cd shell && npm run typecheck
+
+      # Builds the Core first: the handshake test runs against the real binary,
+      # not a stub, because that seam is where a credential mistake would hide.
+      - name: Build Core
+        run: cd core && cargo build -p studio-core
+
+      - name: Tests
+        run: cd shell && npm test
+
+      - name: Build
+        run: cd shell && npm run build
+
+  # The specialists, against the real capability servers.
+  #
+  # Kept a separate job because it needs the sibling checkouts. It matters that this runs
+  # somewhere: the classification tests in the `core` job compare the catalogue against a
+  # list written down beside it, so they catch a catalogue that invents an operation but
+  # not a server that grows one. Only this job compares against what the server actually
+  # exposes — and the integration tests skip rather than fail when a server is missing, so
+  # without this job that guarantee would quietly not exist.
+  specialists:
+    name: specialists
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      # The sibling checkouts the artefact engines and capability servers live in.
+      # Paths must match the `../../../../` path dependencies the crates declare.
+      - name: Check out the engines
+        run: |
+          cd ..
+          for repo in zavora-xlsx zavora-docx zavora-slide mcp-servers adk-rust; do
+            if [ ! -d "$repo" ]; then
+              echo "::error::$repo is not provisioned; the specialist checks cannot run"
+              exit 1
+            fi
+          done
+
+      - name: Build the capability servers
+        run: |
+          cd ../mcp-servers/worksheet-mcp && cargo build --bin excel-mcp-server
+          cd ../docx-mcp && cargo build --bin docx-mcp-server
+          cd ../mcp_slides && cargo build
+
+      # Fails if any server exposes an operation nobody classified. Without the servers
+      # built above these tests would skip, which is why the build step is not optional.
+      - name: The three specialists
+        run: make adk-check
+
+      # Proves the tests above did not silently skip.
+      - name: Prove they ran
+        run: |
+          cd core
+          output=$(cargo test -p studio-runner --features adk --test artefacts -- --nocapture 2>&1)
+          if echo "$output" | grep -q "skipping:"; then
+            echo "::error::the specialist tests skipped; the servers were not available"
+            exit 1
+          fi
+          echo "no skips: every specialist ran against its real server"

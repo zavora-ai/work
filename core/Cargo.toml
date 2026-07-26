@@ -1,0 +1,57 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/studio-api",
+    "crates/studio-artefacts",
+    "crates/studio-decks",
+    "crates/studio-docs",
+    "crates/studio-gate",
+    "crates/studio-jobs",
+    "crates/studio-router",
+    "crates/studio-schedule",
+    "crates/studio-sheets",
+    "crates/studio-runner",
+    "crates/studio-steering",
+    "crates/studio-store",
+    "crates/studio-tray",
+    "crates/studio-strings",
+    "crates/studio-lint",
+    "crates/studio-core",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+# Kept deliberately small. ADK-Rust and the MCP client arrive with task 3.5,
+# once the engine invariants are proven in isolation.
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+regex = "1.11"
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "net", "time"] }
+
+studio-api = { path = "crates/studio-api" }
+studio-artefacts = { path = "crates/studio-artefacts" }
+studio-decks = { path = "crates/studio-decks" }
+studio-docs = { path = "crates/studio-docs" }
+studio-gate = { path = "crates/studio-gate" }
+studio-jobs = { path = "crates/studio-jobs" }
+studio-router = { path = "crates/studio-router" }
+studio-schedule = { path = "crates/studio-schedule" }
+studio-sheets = { path = "crates/studio-sheets" }
+studio-runner = { path = "crates/studio-runner" }
+studio-steering = { path = "crates/studio-steering" }
+studio-store = { path = "crates/studio-store" }
+studio-tray = { path = "crates/studio-tray" }
+studio-strings = { path = "crates/studio-strings" }
+studio-lint = { path = "crates/studio-lint" }
+
+[profile.dev]
+debug = 1

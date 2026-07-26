@@ -1,0 +1,17 @@
+[package]
+name = "studio-store"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# Encrypts the store at rest (Requirement 16.4). Required for any released
+# build; verified in the packaged artefact by task 17.4.
+sqlcipher = ["rusqlite/bundled-sqlcipher"]
+
+[dependencies]
+rusqlite.workspace = true
+thiserror.workspace = true

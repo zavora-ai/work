@@ -1,0 +1,187 @@
+/*
+ * Design tokens.
+ *
+ * Taken from the mockups in .kiro/specs/zavora-work-studio/mockups/, which are the
+ * normative reference for register and treatment.
+ *
+ * Colour is never the only carrier of meaning: every state that has a colour role
+ * also has a glyph shape and a text label (Requirement 21.4).
+ */
+
+:root {
+  --bg: #f7f6f3;
+  --card: #fff;
+  --workspace: #eeece7;
+  --border: #e6e3dd;
+  --border-strong: #d8d4cc;
+  --sel: #efedE8;
+
+  --text: #1c1b19;
+  --muted: #77736b;
+  --faint: #a29d94;
+  --ink-soft: #4e4a43;
+
+  /* state roles — each pairs with a distinct glyph */
+  --working: #3f7fa8;
+  --working-halo: #dfeaf1;
+  --live-bg: #e9f1e5;
+  --live-fg: #3d6733;
+  --warn-bg: #f8efd9;
+  --warn-fg: #8a6414;
+  --warn-edge: #d9a83c;
+  --info-bg: #e7eef5;
+  --info-fg: #2f5878;
+  --info-edge: #7ba3c4;
+  --ask-bg: #efeaf5;
+  --ask-fg: #5a4a78;
+  --ask-edge: #a08cc4;
+  --review-edge: #5c5750;
+
+  --radius: 11px;
+  --radius-sm: 7px;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+}
+
+/* Focus is always visible: the whole product must be operable by keyboard
+   (Requirement 21.1). */
+:focus-visible {
+  outline: 2px solid var(--working);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/*
+ * Skip link. Without it, reaching the content by keyboard costs about thirteen stops
+ * through the left panel on every surface — compliant with Requirement 21.1 and still
+ * miserable. Visible only when focused.
+ */
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 200;
+  background: #26241f;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 0;
+}
+
+.skip:focus {
+  left: 8px;
+}
+
+.main:focus {
+  outline: none;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 26px;
+  overflow-y: auto;
+}
+
+.h1 {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px;
+}
+
+.h2 {
+  font-size: 12px
+;
+  font-weight: 650;
+  color: #5f5a53;
+  margin: 0 0 9px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.title {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ml {
+  margin-left: auto;
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+@keyframes zws-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Someone who has asked the system for less motion gets a static indicator. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

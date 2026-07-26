@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Zavora Work Studio — screen mockups</title>
+<style>
+  :root{
+    --bg:#f7f6f3; --card:#fff; --border:#e6e3dd; --border-strong:#d8d4cc;
+    --text:#1c1b19; --muted:#77736b; --faint:#a29d94;
+    --live-bg:#e9f1e5; --live-fg:#3d6733;
+    --warn-bg:#f8efd9; --warn-fg:#8a6414; --warn-edge:#d9a83c;
+    --info-bg:#e7eef5; --info-fg:#2f5878; --info-edge:#7ba3c4;
+    --ask-bg:#efeaf5; --ask-fg:#5a4a78; --ask-edge:#a08cc4;
+    --review-edge:#5c5750;
+    --sel:#efedE8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:28px;background:#e9e7e2;
+    font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;color:var(--text)}
+  h1.doc{font-size:18px;margin:0 0 4px}
+  p.doc{color:#5b574f;margin:0 0 26px;font-size:13px}
+  .cap{font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;
+    text-transform:uppercase;color:#6d6862;margin:30px 0 8px}
+  .frame{width:1000px;height:660px;background:var(--bg);border:1px solid var(--border-strong);
+    border-radius:14px;overflow:hidden;display:flex;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  /* sidebar */
+  .side{width:206px;background:#fff;border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column}
+  .brand{font-weight:650;font-size:14.5px;padding:0 8px 18px;letter-spacing:-.01em}
+  .nav{display:flex;flex-direction:column;gap:1px}
+  .nav a{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:7px;
+    color:#3a362f;text-decoration:none;font-size:13.5px}
+  .nav a.on{background:var(--sel);font-weight:600}
+  .nav .b{margin-left:auto;background:#e4e0d8;color:#5c574f;font-size:11px;font-weight:650;
+    padding:1px 6px;border-radius:9px}
+  .side .foot{margin-top:auto}
+  .thlist{display:flex;flex-direction:column;gap:1px}
+  .side .sect{padding:14px 9px 5px}
+  .side .th{padding:6px 9px}
+  .side .fi{color:#8a8580;display:grid;place-items:center;width:13px;flex:0 0 auto}
+  /* repository + settings */
+  .crumb{font-size:12px;color:#77736b;margin-bottom:12px}
+  .crumb b{color:#26241f;font-weight:600}
+  .chips{display:flex;gap:6px;margin-bottom:14px;align-items:center}
+  .chip{font-size:12px;font-weight:560;padding:4px 11px;border-radius:20px;border:1px solid var(--border-strong);
+    background:#fff;color:#4e4a43;cursor:pointer}
+  .chip.on{background:#26241f;border-color:#26241f;color:#fff}
+  .tbl{background:#fff;border:1px solid var(--border);border-radius:11px;overflow:hidden}
+  .tbl .hr{display:grid;grid-template-columns:2.1fr 1.2fr 1.4fr 78px;padding:9px 15px;background:#fbfaf8;
+    border-bottom:1px solid var(--border);font-size:10.5px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase;color:#a29d94}
+  .tbl .r{display:grid;grid-template-columns:2.1fr 1.2fr 1.4fr 78px;padding:10px 15px;border-bottom:1px solid #f2f0eb;
+    font-size:12.5px;align-items:center}
+  .tbl .r:last-child{border-bottom:0}
+  .tbl .r .fn{display:flex;gap:9px;align-items:center;min-width:0}
+  .tbl .r .fn .nm2{font-weight:560;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tbl .r .sub{font-size:11px;color:#a29d94;margin-top:2px}
+  .tbl .r .mut{color:#77736b;font-size:12px}
+  .lk{color:#4e4a43;text-decoration:underline;text-decoration-color:#d5d0c7;text-underline-offset:2px}
+  .subnav{display:flex;gap:3px;border-bottom:1px solid var(--border);margin-bottom:18px}
+  .subnav div{font-size:12.5px;font-weight:560;color:#6d6862;padding:7px 11px;cursor:pointer;border-bottom:2px solid transparent}
+  .subnav div.on{color:#26241f;font-weight:650;border-bottom-color:#26241f}
+  .srow{display:flex;align-items:flex-start;gap:16px;padding:14px 0;border-bottom:1px solid #f2f0eb}
+  .srow:last-child{border-bottom:0}
+  .srow .lab{width:186px;flex:0 0 auto}
+  .srow .lab .t2{font-size:13px;font-weight:600}
+  .srow .lab .d2{font-size:11.5px;color:#a29d94;margin-top:2px;line-height:1.4}
+  .srow .ctl{flex:1;min-width:0}
+  .sw{width:36px;height:21px;border-radius:20px;background:#3d6733;position:relative;flex:0 0 auto}
+  .sw:after{content:"";position:absolute;top:2.5px;right:2.5px;width:16px;height:16px;border-radius:50%;background:#fff}
+  .sw.off{background:#d8d4cc}
+  .sw.off:after{right:auto;left:2.5px}
+  .segw{display:inline-flex;gap:2px;background:#f1efea;border-radius:8px;padding:2px}
+  .segw div{font-size:12px;font-weight:600;color:#6d6862;padding:5px 13px;border-radius:6px}
+  .segw div.on{background:#fff;color:#26241f;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  .gnote{background:#fff;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px;
+    display:flex;gap:12px;align-items:flex-start}
+  .gnote .x2{flex:1;font-size:12.5px;line-height:1.45}
+  .scope{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#5f5a53;
+    background:#f1efea;padding:2px 7px;border-radius:5px;white-space:nowrap}
+  svg{flex:0 0 auto}
+  /* main */
+  .main{flex:1;padding:24px 26px;overflow:hidden}
+  .h2{font-size:15px;font-weight:650;margin:0 0 12px;letter-spacing:-.01em}
+  .h3{font-size:12px;font-weight:650;color:#5f5a53;margin:0 0 9px;letter-spacing:.01em}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+  .metric{background:#fff;border:1px solid var(--border);border-radius:11px;padding:13px 15px}
+  .metric .l{font-size:12px;color:var(--muted);line-height:1.3;min-height:31px}
+  .metric .v{font-size:25px;font-weight:640;letter-spacing:-.02em;margin-top:2px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .card{background:#fff;border:1px solid var(--border);border-radius:11px;padding:13px 15px;margin-bottom:9px}
+  .row{display:flex;align-items:flex-start;gap:12px}
+  .t{font-size:13.5px;font-weight:600;line-height:1.3}
+  .s{font-size:12px;color:var(--muted);margin-top:3px}
+  .btn{border:1px solid var(--border-strong);background:#fff;border-radius:7px;padding:5px 12px;
+    font-size:12.5px;font-weight:560;color:#33302a;white-space:nowrap;cursor:pointer}
+  .btn.p{background:#26241f;border-color:#26241f;color:#fff}
+  .btn.sm{padding:3px 9px;font-size:12px}
+  .ml{margin-left:auto}
+  .pill{font-size:11px;font-weight:650;padding:2px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:4px}
+  .pill.live{background:var(--live-bg);color:var(--live-fg)}
+  .pill.pause{background:#eceae5;color:#6b665e}
+  .pill.attn{background:var(--warn-bg);color:var(--warn-fg)}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .jc{background:#fff;border:1px solid var(--border);border-radius:11px;padding:13px 15px}
+  .jc .n{font-size:13.5px;font-weight:600;line-height:1.25}
+  .jc .m{font-size:12px;color:var(--muted);margin-top:8px}
+  /* tray item variants — shape + label + edge, never colour alone */
+  .item{background:#fff;border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:9px;
+    border-left-width:3px;border-left-style:solid;border-left-color:transparent}
+  .item.review{border-left-color:var(--review-edge)}
+  .item.attn{border-left-color:var(--warn-edge)}
+  .item.find{border-left-color:var(--info-edge)}
+  .item.ask{border-left-color:var(--ask-edge)}
+  .ico{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;flex:0 0 auto}
+  .ico.review{background:#eeecE7;color:#4a453e}
+  .ico.attn{background:var(--warn-bg);color:var(--warn-fg)}
+  .ico.find{background:var(--info-bg);color:var(--info-fg)}
+  .ico.ask{background:var(--ask-bg);color:var(--ask-fg)}
+  .kind{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:3px}
+  .kind.review{color:#5c5750}.kind.attn{color:var(--warn-fg)}
+  .kind.find{color:var(--info-fg)}.kind.ask{color:var(--ask-fg)}
+  /* misc */
+  .center{flex:1;display:grid;place-items:center;padding:40px}
+  .panel{width:452px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:26px 28px}
+  .field{border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;font-size:13px;
+    color:var(--faint);background:#fdfdfc;margin:5px 0 4px}
+  .hint{font-size:12px;color:var(--muted);line-height:1.5}
+  .doc-preview{background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 24px;font-size:12.5px;line-height:1.65;color:#2b2823;overflow:hidden}
+  .doc-preview h4{font-size:15px;margin:0 0 3px}
+  .doc-preview .by{font-size:11.5px;color:var(--faint);margin-bottom:12px}
+  .doc-preview li{margin-bottom:7px}
+  .act{display:flex;gap:9px;align-items:center;margin-top:14px}
+  .manifest{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff}
+  .manifest .hd{padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:650;color:#4e4a43;background:#fbfaf8}
+  .mrow{display:flex;gap:11px;align-items:center;padding:9px 14px;border-bottom:1px solid #f0eeE9;font-size:12.5px}
+  .mrow:last-child{border-bottom:0}
+  .mrow .w{font-weight:600;min-width:78px;font-size:11.5px;color:#4e4a43}
+  .mrow .d{color:#3d3933;flex:1}
+  .mrow .c{font-size:11.5px;color:var(--faint)}
+  .note{background:#fff;border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:7px;display:flex;gap:10px;align-items:flex-start}
+  .note .x{font-size:12.5px;line-height:1.4;flex:1}
+  .note .w{font-size:11px;color:var(--faint);margin-top:3px}
+  .chat{display:flex;flex-direction:column;gap:11px}
+  .bub{max-width:86%;border-radius:11px;padding:9px 12px;font-size:12.5px;line-height:1.5}
+  .bub.you{background:#26241f;color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+  .bub.st{background:#fff;border:1px solid var(--border);align-self:flex-start;border-bottom-left-radius:4px}
+  .slide{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px 16px;height:132px;position:relative;overflow:hidden}
+  .slide .st{font-size:13px;font-weight:650;margin-bottom:8px}
+  .bar{height:6px;background:#e8e5df;border-radius:3px;margin-bottom:5px}
+  .thumb{background:#fff;border:1px solid var(--border);border-radius:7px;height:56px;padding:7px 8px;font-size:9.5px;color:var(--faint)}
+  .thumb.on{border-color:#8f8a80;box-shadow:0 0 0 2px #e2ded6}
+  .fl{display:flex;align-items:center;gap:12px;padding:11px 13px;background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:8px}
+  .warnbox{background:var(--warn-bg);border:1px solid #e6cE95;border-radius:10px;padding:13px 15px}
+  .setrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f0eeE9}
+  .setrow:last-child{border-bottom:0}
+  .lock{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--live-fg);font-weight:600}
+  .flow{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#3d3933}
+  .step{background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 11px}
+  /* ---- three-zone document workspace ---- */
+  .frame.wide{width:1180px;height:700px}
+  .zl{width:186px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;flex:0 0 auto}
+  .zl.thin{width:44px;align-items:center;padding-top:12px;gap:14px}
+  .zr{width:262px;background:#fff;border-left:1px solid var(--border);display:flex;flex-direction:column;flex:0 0 auto}
+  .zr.thin{width:44px;align-items:center;padding-top:12px;gap:14px}
+  .zc{flex:1;min-width:0;background:#eeece7;display:flex;flex-direction:column}
+  .zhd{display:flex;align-items:center;gap:7px;padding:11px 12px;border-bottom:1px solid var(--border);
+    font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#6d6862}
+  .zhd .ic{margin-left:auto;color:#a29d94;cursor:pointer}
+  .zbody{padding:8px;overflow:hidden;flex:1}
+  .th{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;font-size:12.5px;color:#3a362f;cursor:pointer}
+  .th.on{background:var(--sel);font-weight:600}
+  .th .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .g{width:11px;height:11px;flex:0 0 auto;display:grid;place-items:center}
+  .g.work{border-radius:50%;background:#3f7fa8;box-shadow:0 0 0 2.5px #dfeaf1}
+  .g.done svg{stroke:#4d7a3f}
+  .g.sched svg{stroke:#8a8580}
+  .g.attn svg{stroke:#b0821f}
+  .g.pause svg{stroke:#8a8580}
+  .tip{position:absolute;background:#26241f;color:#fff;font-size:11px;padding:3px 8px;border-radius:6px;
+    white-space:nowrap;z-index:5;font-weight:500}
+  .navi{font-size:12px;color:#5f5a53;padding:4px 8px;border-radius:6px;cursor:pointer;display:flex;gap:7px}
+  .navi.on{background:var(--sel);color:#26241f;font-weight:600}
+  .sect{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#a29d94;padding:12px 8px 5px}
+  .ctb{display:flex;align-items:center;gap:5px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--border)}
+  .canvas{flex:1;overflow:hidden;padding:18px;display:flex;justify-content:center}
+  .page{background:#fff;border:1px solid #dedad2;box-shadow:0 1px 4px rgba(0,0,0,.05);width:560px;padding:34px 44px;
+    font-size:12.5px;line-height:1.7;color:#2b2823}
+  .seg{display:flex;gap:2px;background:#f1efea;border-radius:7px;padding:2px;margin:8px}
+  .seg div{flex:1;text-align:center;font-size:11.5px;font-weight:600;color:#6d6862;padding:4px 0;border-radius:5px;cursor:pointer}
+  .seg div.on{background:#fff;color:#26241f;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  .dsec{padding:10px 12px;border-bottom:1px solid #f0eeE9}
+  .dsec .h{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#a29d94;margin-bottom:7px}
+  .dsec .li{font-size:12px;color:#3d3933;display:flex;gap:7px;align-items:flex-start;margin-bottom:6px;line-height:1.4}
+  .thumbv{background:#fff;border:1px solid var(--border);border-radius:6px;height:44px;padding:5px 6px;
+    font-size:8.5px;color:#a29d94;margin-bottom:6px;display:flex;gap:6px;align-items:flex-start}
+  .thumbv.on{border-color:#8f8a80;box-shadow:0 0 0 2px #e2ded6}
+  .thumbv .n{font-weight:700;color:#8a8580;font-size:8px}
+</style>
+</head>
+<body>
+<h1 class="doc">Zavora Work Studio — screen mockups</h1>
+<p class="doc">Reference screens for <code>.kiro/specs/zavora-work-studio/journeys.md</code>. All copy obeys the Requirement 1 vocabulary rule.</p>
+
+<!-- ============ 1. DASHBOARD ============ -->
+<div class="cap">S1 · Dashboard</div>
+<div class="frame" id="s1">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="on" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div class="metrics">
+      <div class="metric"><div class="l">Working for you</div><div class="v">5</div></div>
+      <div class="metric"><div class="l">Waiting on you</div><div class="v">3</div></div>
+      <div class="metric"><div class="l">Done today</div><div class="v">11</div></div>
+      <div class="metric"><div class="l">Cost today</div><div class="v">$0.62</div></div>
+    </div>
+    <div class="cols">
+      <div>
+        <div class="h3">Waiting on you</div>
+        <div class="item review"><div class="row">
+          <div class="ico review"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></div>
+          <div><div class="kind review">First draft to check</div><div class="t">Your daily newsletter is ready</div><div class="s">Nothing has been sent yet</div></div>
+          <button class="btn ml">Read it</button></div></div>
+        <div class="item find"><div class="row">
+          <div class="ico find"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg></div>
+          <div><div class="kind find">Worth knowing</div><div class="t">Your startup disk is 94% full</div><div class="s">Found 10 minutes ago · 18 GB in old downloads</div></div>
+          <button class="btn ml">See what's big</button></div></div>
+        <div class="item attn"><div class="row">
+          <div class="ico attn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 9v5M12 17h.01"/></svg></div>
+          <div><div class="kind attn">Needs fixing</div><div class="t">Gmail needs reconnecting</div><div class="s">Inbox triage and Morning digest are paused</div></div>
+          <button class="btn ml">Reconnect</button></div></div>
+      </div>
+      <div>
+        <div class="h3">Done for you</div>
+        <div class="card"><div class="row"><div><div class="t">Posted to X: product update thread</div><div class="s">9:02 am · Social posting</div></div><button class="btn sm ml">Undo</button></div></div>
+        <div class="card"><div class="row"><div><div class="t">Sent your morning digest</div><div class="s">7:00 am · 4 things needed you</div></div></div></div>
+        <div class="card"><div class="row"><div><div class="t">Filed 3 receipts into Expenses.xlsx</div><div class="s">6:40 am · from your inbox</div></div></div></div>
+      </div>
+    </div>
+    <div class="h3" style="margin-top:20px">Running on their own</div>
+    <div class="grid3">
+      <div class="jc"><div class="n">Daily newsletter</div><div class="m"><span class="pill pause">Waiting for your OK</span></div></div>
+      <div class="jc"><div class="n">Inbox triage</div><div class="m"><span class="pill attn">Paused · Gmail</span></div></div>
+      <div class="jc"><div class="n">Computer health</div><div class="m"><span class="pill live">Working</span> <span style="color:#a29d94">· every 2 hours</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 2. FIRST RUN ============ -->
+<div class="cap">S2 · First run — one credential, nothing else</div>
+<div class="frame" id="s2" style="display:block">
+  <div class="center" style="height:100%;display:grid;place-items:center">
+    <div class="panel">
+      <div style="font-size:19px;font-weight:650;letter-spacing:-.015em">Welcome to Zavora Work Studio</div>
+      <div class="hint" style="margin:8px 0 20px">Your work stays on this computer. Paste one key to get started — you can change it later.</div>
+      <div style="font-size:12.5px;font-weight:600;margin-bottom:2px">OpenAI key</div>
+      <div class="field">sk-··········································</div>
+      <div class="hint" style="margin-bottom:18px">Stored in your Mac keychain. Never sent anywhere except OpenAI.</div>
+      <button class="btn p" style="width:100%;padding:9px">Start working</button>
+      <div class="hint" style="text-align:center;margin-top:12px">Use a different provider</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 3. TEMPLATE LIBRARY + CONSENT ============ -->
+<div class="cap">S3 · The full library of recurring work (no empty state) + account consent</div>
+<div class="frame" id="s3">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="on" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div class="h2">What should I take off your hands?</div>
+    <div class="hint" style="margin:-6px 0 16px">Pick one. I'll do it once and show you before anything leaves this computer.</div>
+    <div class="grid3" style="gap:11px">
+      <div class="jc"><div class="n">Daily newsletter</div><div class="m">A short brief from your sources, in your inbox each morning.</div><div class="act"><button class="btn sm">Try it</button><span class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Ready</span></div></div>
+      <div class="jc"><div class="n">Inbox triage</div><div class="m">Sorts, flags and drafts replies. You keep the send button.</div><div class="act"><button class="btn sm">Try it</button><span style="font-size:12px;color:#a29d94">Needs Gmail</span></div></div>
+      <div class="jc"><div class="n">Computer health</div><div class="m">Watches disk, memory and backups. Tells you before it bites.</div><div class="act"><button class="btn sm">Try it</button><span class="lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>Ready</span></div></div>
+    </div>
+    <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
+      <div>
+        <div class="h3">More to choose from</div>
+        <div class="card"><div class="row"><div class="t">Morning digest</div><span class="ml" style="font-size:12px;color:#a29d94">Gmail · Calendar</span></div></div>
+        <div class="card"><div class="row"><div class="t">Meeting prep</div><span class="ml" style="font-size:12px;color:#a29d94">Calendar</span></div></div>
+        <div class="card"><div class="row"><div class="t">Social posting</div><span class="ml" style="font-size:12px;color:#a29d94">X</span></div></div>
+        <div class="card"><div class="row"><div class="t">Weekly report roll-up</div><span class="ml" style="font-size:12px;color:#a29d94">Ready</span></div></div>
+      </div>
+      <div class="panel" style="width:auto;padding:20px 22px">
+        <div style="font-size:14.5px;font-weight:650">Connect Gmail for Inbox triage</div>
+        <div class="hint" style="margin:8px 0 14px">So it can do this job, it will:</div>
+        <div style="font-size:12.5px;line-height:1.9;margin-bottom:14px">
+          <div>✓ Read the messages in your inbox</div>
+          <div>✓ Add labels and archive what you don't need</div>
+          <div>✓ Write draft replies — and leave them as drafts</div>
+        </div>
+        <div class="hint" style="margin-bottom:16px">It will never send a message without you. Only Inbox triage uses this.</div>
+        <div class="act"><button class="btn p">Connect Gmail</button><button class="btn">Not now</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 4. KICKOFF REVIEW — DOCUMENT OUTPUT ============ -->
+<div class="cap">S4 · First-draft review — output you'd have received (newsletter)</div>
+<div class="frame" id="s4">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="on" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <div class="ico review"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></div>
+      <div class="h2" style="margin:0">This is what I'd have emailed you</div>
+    </div>
+    <div class="hint" style="margin:0 0 14px 36px">Nothing was sent. Change anything you like — I'll remember it.</div>
+    <div class="doc-preview" style="height:340px">
+      <h4>Your Monday brief</h4>
+      <div class="by">3 sources · 6 minute read</div>
+      <div style="font-weight:600;margin-bottom:6px">What moved</div>
+      <ul style="margin:0 0 12px;padding-left:18px">
+        <li>The EU AI Act's general-purpose obligations took effect Friday. Vendors with EU customers now need model documentation on file.</li>
+        <li>Two of your three tracked competitors shipped pricing changes this week, both moving to usage-based tiers.</li>
+        <li>Kenyan T-bill yields eased for a third week, now averaging 11.4% on the 91-day.</li>
+      </ul>
+      <div style="font-weight:600;margin-bottom:6px">Worth a look</div>
+      <ul style="margin:0;padding-left:18px">
+        <li>A long read on why on-device inference is getting cheaper faster than cloud inference.</li>
+        <li>Your saved search "agent framework" turned up four new repositories over 1k stars.</li>
+      </ul>
+    </div>
+    <div class="act">
+      <button class="btn p">Looks good — send it daily at 7:00 am</button>
+      <button class="btn">Edit it first</button>
+      <button class="btn">Not quite — tell it why</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 5. KICKOFF REVIEW — INTENDED ACTIONS ============ -->
+<div class="cap">S5 · First-draft review where the output is actions, not a document (inbox triage)</div>
+<div class="frame" id="s5">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="on" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <div class="ico review"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div>
+      <div class="h2" style="margin:0">Here's what I'd have done to your inbox</div>
+    </div>
+    <div class="hint" style="margin:0 0 14px 36px">Your inbox is untouched. Uncheck anything you'd rather I left alone.</div>
+    <div class="manifest">
+      <div class="hd">42 messages this morning</div>
+      <div class="mrow"><span class="w">Archive</span><span class="d">18 newsletters and receipts you've never opened</span><span class="c">reversible</span></div>
+      <div class="mrow"><span class="w">Label</span><span class="d">9 messages as <b>Needs reply</b> — 3 of them are from clients</span><span class="c">reversible</span></div>
+      <div class="mrow"><span class="w">Draft</span><span class="d">4 replies, left unsent in your drafts folder</span><span class="c">you send them</span></div>
+      <div class="mrow"><span class="w">Leave alone</span><span class="d">11 messages I wasn't confident about</span><span class="c">—</span></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="row"><div><div class="t">Want to read one of the drafts?</div><div class="s">Reply to Achieng about the Thursday deadline</div></div><button class="btn sm ml">Open draft</button></div>
+    </div>
+    <div class="act">
+      <button class="btn p">Do this every 2 hours</button>
+      <button class="btn">Just this once</button>
+      <button class="btn">Not quite — tell it why</button>
+    </div>
+    <div class="hint" style="margin-top:12px">Everything here can be undone from <b>Done for you</b> for 30 days.</div>
+  </div>
+</div>
+
+<!-- ============ 6. IN TRAY — FOUR CLASSES ============ -->
+<div class="cap">S6 · Waiting on you — four item kinds, distinguished by shape, label and edge (never colour alone)</div>
+<div class="frame" id="s6">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="on" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div class="h2">Waiting on you</div>
+    <div class="item review"><div class="row">
+      <div class="ico review"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></div>
+      <div><div class="kind review">First draft to check</div><div class="t">Your weekly report roll-up is ready</div><div class="s">Nothing has been shared · Weekly report roll-up</div></div>
+      <button class="btn ml">Read it</button></div></div>
+    <div class="item ask"><div class="row">
+      <div class="ico ask"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.1 9a3 3 0 1 1 4.6 2.5c-.9.6-1.7 1.1-1.7 2.5"/><path d="M12 18h.01"/><circle cx="12" cy="12" r="9"/></svg></div>
+      <div><div class="kind ask">Needs your call</div><div class="t">Two of these look like the same invoice</div><div class="s">I was filing receipts and found a £480 charge twice, three days apart. Expense capture.</div></div>
+      <div class="ml" style="display:flex;gap:7px"><button class="btn sm">File both</button><button class="btn sm">File one</button></div></div></div>
+    <div class="item find"><div class="row">
+      <div class="ico find"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg></div>
+      <div><div class="kind find">Worth knowing</div><div class="t">Your startup disk is 94% full</div><div class="s">Nothing is broken yet. 18 GB sits in Downloads from before April. Computer health.</div></div>
+      <div class="ml" style="display:flex;gap:7px"><button class="btn sm">See what's big</button><button class="btn sm">Got it</button></div></div></div>
+    <div class="item attn"><div class="row">
+      <div class="ico attn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 9v5M12 17h.01"/></svg></div>
+      <div><div class="kind attn">Needs fixing</div><div class="t">Gmail needs reconnecting</div><div class="s">Your sign-in expired on Thursday. Inbox triage and Morning digest are paused until you reconnect — I've stopped trying.</div></div>
+      <button class="btn ml">Reconnect Gmail</button></div></div>
+    <div class="hint" style="margin-top:16px">Nothing here expires and nothing gets decided for you.</div>
+  </div>
+</div>
+
+<!-- ============ 7. JOB DETAIL + STEERING ============ -->
+<div class="cap">S7 · Task detail — history in plain sentences, steering list as the transparency surface</div>
+<div class="frame" id="s7">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th on" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px">
+      <div><div class="h2" style="margin:0 0 3px">Daily newsletter</div>
+        <div class="hint">Every weekday at 7:00 am · next tomorrow, 7:00 am · 4p a day</div></div>
+      <div class="ml" style="display:flex;gap:8px;align-items:center"><span class="pill live">Working</span><button class="btn sm">Pause</button><button class="btn sm">Run now</button></div>
+    </div>
+    <div class="cols">
+      <div>
+        <div class="h3">What it's done</div>
+        <div class="card" style="padding:11px 14px"><div class="t" style="font-weight:560">Sent your Monday brief — 3 sources, 6 minute read</div><div class="s">Today, 7:00 am</div></div>
+        <div class="card" style="padding:11px 14px"><div class="t" style="font-weight:560">Sent Friday's brief — you said it was too long</div><div class="s">Friday, 7:00 am</div></div>
+        <div class="card" style="padding:11px 14px"><div class="t" style="font-weight:560">Sent Thursday's brief</div><div class="s">Thursday, 7:00 am</div></div>
+        <div class="card" style="padding:11px 14px"><div class="t" style="font-weight:560">You approved the first draft</div><div class="s">Wednesday, 4:12 pm</div></div>
+      </div>
+      <div>
+        <div class="h3">What I've learned from you</div>
+        <div class="note"><div class="x">Keep it under 400 words.<div class="w">You shortened Friday's draft · 2 days ago</div></div><button class="btn sm">Edit</button></div>
+        <div class="note"><div class="x">Don't include crypto prices.<div class="w">You told me on Friday</div></div><button class="btn sm">Edit</button></div>
+        <div class="note"><div class="x">Lead with anything about the EU AI Act.<div class="w">You told me last week</div></div><button class="btn sm">Edit</button></div>
+        <div class="field" style="color:#a29d94;margin-top:10px">Tell it something new…</div>
+        <div class="hint" style="margin-top:6px">This is everything I go on. Change or delete any of it.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 8. OUT TRAY ============ -->
+<div class="cap">S8 · Done for you — reversal where honest, plain marking where not, non-blocking steering</div>
+<div class="frame" id="s8">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="on" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div class="h2">Done for you</div>
+    <div class="card"><div class="row">
+      <div><div class="t">Posted to X: "We shipped local-first document editing…"</div><div class="s">9:02 am · Social posting · 14 likes so far</div></div>
+      <div class="ml" style="display:flex;gap:7px"><button class="btn sm">Take it down</button><button class="btn sm">Steer</button></div></div>
+      <div class="field" style="margin:11px 0 0;color:#3d3933;background:#fbfaf8">Too promotional — write like a person next time.</div>
+      <div class="hint" style="margin-top:6px">Saved. This applies from your next post.</div>
+    </div>
+    <div class="card"><div class="row">
+      <div><div class="t">Sent your morning digest</div><div class="s">7:00 am · Morning digest · 4 things needed you</div></div>
+      <div class="ml" style="display:flex;gap:7px;align-items:center"><span style="font-size:12px;color:#a29d94">Can't be unsent</span><button class="btn sm">Steer</button></div></div></div>
+    <div class="card"><div class="row">
+      <div><div class="t">Filed 3 receipts into Expenses.xlsx</div><div class="s">6:40 am · Expense capture</div></div>
+      <div class="ml" style="display:flex;gap:7px"><button class="btn sm">Undo</button><button class="btn sm">Open file</button></div></div></div>
+    <div class="card"><div class="row">
+      <div><div class="t">Checked your computer — all clear</div><div class="s">6:00 am · Computer health · quiet runs are hidden</div></div></div></div>
+    <div class="card"><div class="row">
+      <div><div class="t">Archived 18 messages, drafted 4 replies</div><div class="s">Yesterday, 5:00 pm · Inbox triage</div></div>
+      <div class="ml" style="display:flex;gap:7px"><button class="btn sm">Undo all</button><button class="btn sm">See list</button></div></div></div>
+  </div>
+</div>
+
+<!-- ============ 9. DOCUMENTS — HOME ============ -->
+<div class="cap">S9 · New work — one way in, whether it is a file or a recurring task</div>
+<div class="frame" id="s9">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="on" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div class="h2">What do you need?</div>
+    <div class="field" style="padding:13px 14px;font-size:13.5px;color:#a29d94;margin-bottom:8px">Describe it — "a board deck from last quarter's numbers"</div>
+    <div class="hint" style="margin-bottom:20px">Or drop a file here to keep working on it.</div>
+    <div class="h3">Or hand over something that runs on its own</div>
+    <div class="grid3" style="gap:11px;margin-bottom:20px">
+      <div class="jc"><div class="n">Daily newsletter</div><div class="m">A short brief from your sources each morning.</div></div>
+      <div class="jc"><div class="n">Inbox triage</div><div class="m">Sorts and drafts. You keep the send button.</div></div>
+      <div class="jc"><div class="n">See all 10</div><div class="m">Monitors, digests, meeting prep, expenses.</div></div>
+    </div>
+    <div class="h3">Pick up where you left off</div>
+    <div class="fl"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#77736b" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>
+      <div><div class="t" style="font-weight:560">Q3 revenue model.xlsx</div><div class="s">You and I both edited it · 20 minutes ago</div></div>
+      <span class="ml" style="font-size:12px;color:#a29d94">12 versions</span></div>
+    <div class="fl"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#77736b" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
+      <div><div class="t" style="font-weight:560">Board deck — July.pptx</div><div class="s">I made this yesterday from Q3 revenue model.xlsx</div></div>
+      <span class="ml" style="font-size:12px;color:#a29d94">4 versions</span></div>
+    <div class="hint" style="margin-top:14px">Your files live in <b>Documents › Work Studio</b> on your Mac.</div>
+  </div>
+</div>
+
+<!-- ============ 11. FIDELITY WARNING ============ -->
+<div class="cap">S11 · Honest limits — a file it can't edit safely</div>
+<div class="frame" id="s11">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th on" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main" style="display:flex;gap:18px;padding:20px 22px">
+    <div style="width:340px;display:flex;flex-direction:column">
+      <div class="h3">Partnership agreement — draft 3.docx</div>
+      <div class="chat">
+        <div class="bub you">Tighten the termination clause and add a 60-day notice period</div>
+        <div class="bub st">Before I touch this — your file has <b>tracked changes and 14 comments</b> from your lawyer that I can't keep. If I edit this copy, they'd be lost.</div>
+      </div>
+      <div class="field" style="margin-top:auto;color:#a29d94">Reply…</div>
+    </div>
+    <div style="flex:1">
+      <div class="warnbox">
+        <div style="display:flex;gap:11px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8a6414" stroke-width="2" style="margin-top:1px"><path d="M12 3 2 20h20L12 3z"/><path d="M12 9v5M12 17h.01"/></svg>
+          <div>
+            <div style="font-weight:650;font-size:13.5px;color:#6f5210">I'd lose your lawyer's markup</div>
+            <div style="font-size:12.5px;line-height:1.6;color:#5f4a15;margin-top:6px">
+              This document has 23 tracked changes and 14 comments. I can read them, but I can't write them back yet — so saving over this file would strip them out.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="t">Work on a copy instead</div>
+        <div class="s">I'll make <b>Partnership agreement — draft 4.docx</b> with your changes, and leave draft 3 exactly as it is with all the markup.</div>
+        <div class="act"><button class="btn p">Work on a copy</button><button class="btn">Just tell me what to change</button></div>
+      </div>
+      <div class="hint" style="margin-top:14px">I check every file this way before I edit it.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 12. PRIVACY ============ -->
+<div class="cap">S12 · What leaves this computer</div>
+<div class="frame" id="s12">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="on" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div class="h2">What leaves this computer</div>
+    <div class="hint" style="margin:-6px 0 18px">Everything else — your files, your tasks, what I've learned about you — stays here.</div>
+    <div class="card" style="padding:16px">
+      <div class="flow"><span class="step">Your words and files</span><svg width="18" height="12" viewBox="0 0 24 14" fill="none" stroke="#a29d94" stroke-width="1.8"><path d="M0 7h20M15 2l5 5-5 5"/></svg><span class="step"><b>OpenAI</b> — to write and reason</span></div>
+      <div class="hint" style="margin-top:9px">Only the part of a task that needs writing. Nothing is kept by them for training on business accounts.</div>
+    </div>
+    <div class="card" style="padding:16px">
+      <div class="flow"><span class="step">Newsletters and posts</span><svg width="18" height="12" viewBox="0 0 24 14" fill="none" stroke="#a29d94" stroke-width="1.8"><path d="M0 7h20M15 2l5 5-5 5"/></svg><span class="step"><b>Gmail</b>, <b>X</b> — because you asked them to go there</span></div>
+    </div>
+    <div style="margin-top:18px">
+      <div class="h3">Connected accounts</div>
+      <div class="setrow"><div><div class="t" style="font-weight:560">Gmail · james@zavora.ai</div><div class="s">Reads your inbox, sends what you approve · used by 3 tasks</div></div><button class="btn sm ml">Disconnect</button></div>
+      <div class="setrow"><div><div class="t" style="font-weight:560">Google Calendar</div><div class="s">Reads events, creates events · used by 2 tasks</div></div><button class="btn sm ml">Disconnect</button></div>
+      <div class="setrow"><div><div class="t" style="font-weight:560">X · @zavora_ai</div><div class="s">Posts and deletes posts · used by 1 task</div></div><button class="btn sm ml">Disconnect</button></div>
+    </div>
+    <div style="display:flex;gap:9px;margin-top:20px">
+      <button class="btn">Export everything</button>
+      <button class="btn">Delete everything on this computer</button>
+      <span class="lock ml"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Locked on this disk</span>
+    </div>
+  </div>
+</div>
+<!-- ============ 15. DOCUMENT WORKSPACE (WORD-LIKE) ============ -->
+<div class="cap">S15 · Document workspace — threads + outline left, page centre, conversation right</div>
+<div class="frame wide" id="s15">
+  <div class="zl">
+    <div class="zhd">Your work
+      <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+    </div>
+    <div class="zbody" style="padding-bottom:0">
+      <div class="th on"><span class="g work"></span><span class="nm">Supplier agreement</span></div>
+      <div class="th" style="position:relative"><span class="g sched"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span>
+        <span class="tip" style="left:96px;top:26px">Next tomorrow, 7:00 am</span>
+      </div>
+      <div class="th"><span class="g attn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th"><span class="g done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th"><span class="g done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th"><span class="g pause"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 5v14M15 5v14"/></svg></span><span class="nm">Social posting</span></div>
+            <div class="th" tabindex="0" style="color:#6d6862"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Documents</span><svg class="ml" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c4bfb6" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="sect">In this document</div>
+      <div class="navi">7. Payment terms</div>
+      <div class="navi on">8. Termination</div>
+      <div class="navi" style="padding-left:22px">8.3 Notice period</div>
+      <div class="navi">9. Confidentiality</div>
+      <div class="navi">10. Governing law</div>
+    </div>
+  </div>
+  <div class="zc">
+    <div class="ctb">
+      <span style="font-size:12.5px;font-weight:650;margin-right:6px">Supplier agreement.docx</span>
+      <button class="btn sm" style="font-weight:700">B</button><button class="btn sm" style="font-style:italic">I</button>
+      <button class="btn sm">Heading</button><button class="btn sm">List</button><button class="btn sm">Table</button><button class="btn sm">Comment</button>
+      <div class="ml" style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:11.5px;color:#3d6733;font-weight:600">2 changes by me</span>
+        <button class="btn sm">Details</button>
+      </div>
+    </div>
+    <div class="canvas">
+      <div class="page">
+        <div style="font-size:10.5px;color:#a29d94;margin-bottom:14px">Page 3 of 7</div>
+        <div style="font-weight:650;font-size:13.5px;margin-bottom:8px">8. Termination</div>
+        <div style="margin-bottom:10px">8.1 Either party may terminate this agreement for material breach that remains uncured for thirty (30) days after written notice.</div>
+        <div style="margin-bottom:10px">8.2 Termination shall not affect any accrued rights or liabilities of either party as at the date of termination.</div>
+        <div style="background:#eef4ea;border-left:2.5px solid #7fa06f;padding:8px 11px;margin:0 0 10px -11px;border-radius:0 4px 4px 0;position:relative">
+          8.3 Either party may terminate this agreement for convenience by giving not less than sixty (60) days' written notice to the other party.
+          <span style="position:absolute;right:-6px;top:-9px;background:#3d6733;color:#fff;font-size:9px;font-weight:700;padding:1.5px 6px;border-radius:9px">I added this</span>
+        </div>
+        <div style="font-weight:650;font-size:13.5px;margin:18px 0 8px">9. Confidentiality</div>
+        <div style="margin-bottom:10px">9.1 Each party shall keep confidential all information disclosed by the other party in connection with this agreement.</div>
+        <div style="color:#a29d94">9.2 The obligations in clause 9.1 shall survive termination for a period of three (3) years.</div>
+      </div>
+    </div>
+  </div>
+  <div class="zr">
+    <div class="zhd">Chat
+      <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </div>
+    <div class="seg"><div class="on">Chat</div><div>Details</div><div>Format</div></div>
+    <div class="zbody" style="display:flex;flex-direction:column;gap:9px">
+      <div class="bub you" style="max-width:100%;font-size:12px">Add a 60-day notice period to termination</div>
+      <div class="bub st" style="max-width:100%;font-size:12px">Added it as clause 8.3 and updated the cross-reference in 12.1 so they agree.</div>
+      <div style="border:1px solid var(--border);border-radius:9px;padding:9px 10px;background:#fbfaf8">
+        <div style="font-size:11.5px;font-weight:650;margin-bottom:5px">Changed 2 clauses</div>
+        <div style="display:flex;gap:6px"><button class="btn sm">Undo</button><button class="btn sm">Review</button></div>
+      </div>
+      <div class="field" style="margin-top:auto;color:#a29d94;font-size:12px">Ask for a change…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 16. SPREADSHEET WORKSPACE (EXCEL-LIKE) ============ -->
+<div class="cap">S16 · Spreadsheet workspace — sheets left, grid and formula bar centre, conversation right</div>
+<div class="frame wide" id="s16">
+  <div class="zl">
+    <div class="zhd">Your work <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></div>
+    <div class="zbody" style="padding-bottom:0">
+      <div class="th"><span class="g work"></span><span class="nm">Supplier agreement</span></div>
+      <div class="th on"><span class="g work"></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th"><span class="g done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th"><span class="g sched"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Expense capture</span></div>
+            <div class="th" tabindex="0" style="color:#6d6862"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Documents</span><svg class="ml" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c4bfb6" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="sect">Sheets</div>
+      <div class="navi on">Summary</div>
+      <div class="navi">Detail</div>
+      <div class="navi">Assumptions</div>
+      <div class="sect">Named things</div>
+      <div class="navi">Growth_rate</div>
+      <div class="navi">FX_rate</div>
+    </div>
+  </div>
+  <div class="zc">
+    <div class="ctb">
+      <span style="font-size:12.5px;font-weight:650;margin-right:6px">Q3 revenue model.xlsx</span>
+      <button class="btn sm">Format</button><button class="btn sm">Chart</button><button class="btn sm">Pivot</button><button class="btn sm">Rules</button>
+      <div class="ml" style="display:flex;gap:6px;align-items:center"><span style="font-size:11.5px;color:#3d6733;font-weight:600">1 change by me</span><button class="btn sm">Details</button></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#fff;border-bottom:1px solid var(--border)">
+      <span style="font-size:11.5px;font-weight:650;color:#5f5a53;min-width:26px">D7</span>
+      <div class="field" style="flex:1;margin:0;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#3d3933;background:#fdfdfc">=C7*1.12</div>
+    </div>
+    <div style="padding:16px 18px;flex:1;overflow:hidden">
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff;font-size:11.5px">
+        <div style="display:grid;grid-template-columns:34px repeat(4,1fr);background:#f7f6f3;border-bottom:1px solid var(--border);font-weight:650;color:#5f5a53;text-align:center">
+          <div style="padding:5px 0"></div><div style="padding:5px 0;border-left:1px solid var(--border)">A</div><div style="padding:5px 0;border-left:1px solid var(--border)">B</div><div style="padding:5px 0;border-left:1px solid var(--border)">C</div><div style="padding:5px 0;border-left:1px solid var(--border)">D</div>
+        </div>
+        <div style="display:grid;grid-template-columns:34px repeat(4,1fr);text-align:right;color:#3d3933">
+          <div style="padding:6px 0;text-align:center;background:#f7f6f3;color:#a29d94">5</div><div style="padding:6px 9px;text-align:left;font-weight:600">Month</div><div style="padding:6px 9px">Units</div><div style="padding:6px 9px">Base</div><div style="padding:6px 9px;background:#eef4ea">+12%</div>
+          <div style="padding:6px 0;text-align:center;background:#f7f6f3;color:#a29d94">6</div><div style="padding:6px 9px;text-align:left">July</div><div style="padding:6px 9px">1,240</div><div style="padding:6px 9px">4,960,000</div><div style="padding:6px 9px;background:#f7fbf5">5,555,200</div>
+          <div style="padding:6px 0;text-align:center;background:#eef0f4;color:#5f5a53;font-weight:650">7</div><div style="padding:6px 9px;text-align:left">August</div><div style="padding:6px 9px">1,310</div><div style="padding:6px 9px">5,240,000</div><div style="padding:6px 9px;background:#fff;outline:2px solid #6f8fa8;outline-offset:-2px;font-weight:650">5,868,800</div>
+          <div style="padding:6px 0;text-align:center;background:#f7f6f3;color:#a29d94">8</div><div style="padding:6px 9px;text-align:left">September</div><div style="padding:6px 9px">1,455</div><div style="padding:6px 9px">5,820,000</div><div style="padding:6px 9px;background:#f7fbf5">6,518,400</div>
+          <div style="padding:6px 0;text-align:center;background:#f7f6f3;color:#a29d94">9</div><div style="padding:6px 9px;text-align:left;font-weight:650">Q3 total</div><div style="padding:6px 9px;font-weight:650">4,005</div><div style="padding:6px 9px;font-weight:650">16,020,000</div><div style="padding:6px 9px;background:#eef4ea;font-weight:650">17,942,400</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:11px 13px;width:340px">
+        <div style="font-size:11px;font-weight:650;color:#5f5a53;margin-bottom:9px">Base vs +12%</div>
+        <div style="display:flex;gap:12px;align-items:flex-end;height:58px">
+          <div style="flex:1;display:flex;gap:3px;align-items:flex-end"><div style="flex:1;height:38px;background:#8fa8b8;border-radius:2px 2px 0 0"></div><div style="flex:1;height:43px;background:#7fa06f;border-radius:2px 2px 0 0"></div></div>
+          <div style="flex:1;display:flex;gap:3px;align-items:flex-end"><div style="flex:1;height:45px;background:#8fa8b8;border-radius:2px 2px 0 0"></div><div style="flex:1;height:51px;background:#7fa06f;border-radius:2px 2px 0 0"></div></div>
+          <div style="flex:1;display:flex;gap:3px;align-items:flex-end"><div style="flex:1;height:53px;background:#8fa8b8;border-radius:2px 2px 0 0"></div><div style="flex:1;height:58px;background:#7fa06f;border-radius:2px 2px 0 0"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="zr">
+    <div class="zhd">Chat <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+    <div class="seg"><div class="on">Chat</div><div>Details</div><div>Format</div></div>
+    <div class="zbody" style="display:flex;flex-direction:column;gap:9px">
+      <div class="bub you" style="max-width:100%;font-size:12px">Add a 12% growth case next to the base case</div>
+      <div class="bub st" style="max-width:100%;font-size:12px">Added column D with 12% applied to each month and extended the total row. The chart picked it up.</div>
+      <div style="border:1px solid var(--border);border-radius:9px;padding:9px 10px;background:#fbfaf8">
+        <div style="font-size:11.5px;font-weight:650;margin-bottom:5px">Changed 5 cells and 1 chart</div>
+        <div style="display:flex;gap:6px"><button class="btn sm">Undo</button><button class="btn sm">Review</button></div>
+      </div>
+      <div class="field" style="margin-top:auto;color:#a29d94;font-size:12px">Ask for a change…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 17. DECK WORKSPACE (PPT-LIKE) ============ -->
+<div class="cap">S17 · Deck workspace — thumbnails left, slide stage centre, conversation right</div>
+<div class="frame wide" id="s17">
+  <div class="zl">
+    <div class="zhd">Your work <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></div>
+    <div class="zbody" style="padding-bottom:0">
+      <div class="th on"><span class="g work"></span><span class="nm">Board deck — July</span></div>
+      <div class="th"><span class="g done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+            <div class="th" tabindex="0" style="color:#6d6862"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Documents</span><svg class="ml" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c4bfb6" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="sect">Slides</div>
+      <div class="thumbv"><span class="n">1</span><span>Title</span></div>
+      <div class="thumbv"><span class="n">2</span><span>Revenue</span></div>
+      <div class="thumbv"><span class="n">3</span><span>Margin</span></div>
+      <div class="thumbv"><span class="n">4</span><span>Runway</span></div>
+      <div class="thumbv on"><span class="n">5</span><span>Regions</span></div>
+      <div class="thumbv"><span class="n">6</span><span>Pipeline</span></div>
+      <div class="thumbv"><span class="n">7</span><span>Risks</span></div>
+    </div>
+  </div>
+  <div class="zc">
+    <div class="ctb">
+      <span style="font-size:12.5px;font-weight:650;margin-right:6px">Board deck — July.pptx</span>
+      <button class="btn sm">Text</button><button class="btn sm">Shape</button><button class="btn sm">Chart</button><button class="btn sm">Colours</button>
+      <div class="ml" style="display:flex;gap:6px;align-items:center"><span style="font-size:11.5px;color:#3d6733;font-weight:600">Slide 5 of 8</span><button class="btn sm">Details</button></div>
+    </div>
+    <div class="canvas" style="align-items:center">
+      <div style="background:#fff;border:1px solid #dedad2;box-shadow:0 1px 5px rgba(0,0,0,.06);width:520px;height:293px;padding:26px 30px">
+        <div style="font-size:15px;font-weight:650;margin-bottom:14px">Revenue by region — Q3</div>
+        <div style="display:flex;gap:16px;align-items:flex-end;height:170px;position:relative;outline:1.5px solid #7ba3c4;outline-offset:6px;border-radius:2px">
+          <div style="position:absolute;top:-12px;left:-12px;width:8px;height:8px;background:#fff;border:1.5px solid #7ba3c4"></div>
+          <div style="position:absolute;top:-12px;right:-12px;width:8px;height:8px;background:#fff;border:1.5px solid #7ba3c4"></div>
+          <div style="position:absolute;bottom:-12px;left:-12px;width:8px;height:8px;background:#fff;border:1.5px solid #7ba3c4"></div>
+          <div style="position:absolute;bottom:-12px;right:-12px;width:8px;height:8px;background:#fff;border:1.5px solid #7ba3c4"></div>
+          <div style="flex:1"><div style="height:130px;background:#8fa8b8;border-radius:3px 3px 0 0"></div><div style="font-size:10px;color:#77736b;margin-top:5px;text-align:center">Kenya</div></div>
+          <div style="flex:1"><div style="height:92px;background:#a8bcc9;border-radius:3px 3px 0 0"></div><div style="font-size:10px;color:#77736b;margin-top:5px;text-align:center">Nigeria</div></div>
+          <div style="flex:1"><div style="height:61px;background:#c2d1da;border-radius:3px 3px 0 0"></div><div style="font-size:10px;color:#77736b;margin-top:5px;text-align:center">Ghana</div></div>
+          <div style="flex:1"><div style="height:38px;background:#d9e2e8;border-radius:3px 3px 0 0"></div><div style="font-size:10px;color:#77736b;margin-top:5px;text-align:center">Rest</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:0 18px 12px;font-size:12px;color:#77736b">Click anything on the slide to change it yourself.</div>
+  </div>
+  <div class="zr">
+    <div class="zhd">Chat <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+    <div class="seg"><div class="on">Chat</div><div>Details</div><div>Format</div></div>
+    <div class="zbody" style="display:flex;flex-direction:column;gap:9px">
+      <div class="bub you" style="max-width:100%;font-size:12px">Make a board deck from last quarter's numbers</div>
+      <div class="bub st" style="max-width:100%;font-size:12px">Built 8 slides from <b>Q3 revenue model.xlsx</b> — revenue, margin, runway and the regional split.</div>
+      <div class="bub you" style="max-width:100%;font-size:12px">Regional split on its own slide with a chart</div>
+      <div class="bub st" style="max-width:100%;font-size:12px">Done — slide 5. I also fixed the contrast on the axis labels so it reads on a projector.</div>
+      <div style="border:1px solid var(--border);border-radius:9px;padding:9px 10px;background:#fbfaf8">
+        <div style="font-size:11.5px;font-weight:650;margin-bottom:5px">Changed 3 slides</div>
+        <div style="display:flex;gap:6px"><button class="btn sm">Undo</button><button class="btn sm">Review</button></div>
+      </div>
+      <div class="field" style="margin-top:auto;color:#a29d94;font-size:12px">Ask for a change…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 18. RIGHT PANEL — DETAILS PANE ============ -->
+<div class="cap">S18 · Right panel showing Details instead of chat — four sections, nothing developer-shaped</div>
+<div class="frame wide" id="s18">
+  <div class="zl">
+    <div class="zhd">Your work <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></div>
+    <div class="zbody" style="padding-bottom:0">
+      <div class="th on"><span class="g work"></span><span class="nm">Board deck — July</span></div>
+      <div class="th"><span class="g done"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+            <div class="th" tabindex="0" style="color:#6d6862"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Documents</span><svg class="ml" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#c4bfb6" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+      <div class="sect">Slides</div>
+      <div class="thumbv"><span class="n">3</span><span>Margin</span></div>
+      <div class="thumbv"><span class="n">4</span><span>Runway</span></div>
+      <div class="thumbv on"><span class="n">5</span><span>Regions</span></div>
+      <div class="thumbv"><span class="n">6</span><span>Pipeline</span></div>
+    </div>
+  </div>
+  <div class="zc">
+    <div class="ctb">
+      <span style="font-size:12.5px;font-weight:650;margin-right:6px">Board deck — July.pptx</span>
+      <button class="btn sm">Text</button><button class="btn sm">Shape</button><button class="btn sm">Chart</button><button class="btn sm">Colours</button>
+      <div class="ml"><button class="btn sm p" style="background:#26241f;border-color:#26241f;color:#fff">Details</button></div>
+    </div>
+    <div class="canvas" style="align-items:center">
+      <div style="background:#fff;border:1px solid #dedad2;box-shadow:0 1px 5px rgba(0,0,0,.06);width:470px;height:264px;padding:24px 28px">
+        <div style="font-size:14px;font-weight:650;margin-bottom:12px">Revenue by region — Q3</div>
+        <div style="display:flex;gap:14px;align-items:flex-end;height:150px">
+          <div style="flex:1"><div style="height:114px;background:#8fa8b8;border-radius:3px 3px 0 0"></div></div>
+          <div style="flex:1"><div style="height:80px;background:#a8bcc9;border-radius:3px 3px 0 0"></div></div>
+          <div style="flex:1"><div style="height:53px;background:#c2d1da;border-radius:3px 3px 0 0"></div></div>
+          <div style="flex:1"><div style="height:33px;background:#d9e2e8;border-radius:3px 3px 0 0"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="zr">
+    <div class="zhd">Details <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>
+    <div class="seg"><div>Chat</div><div class="on">Details</div><div>Format</div></div>
+    <div style="overflow:hidden;flex:1">
+      <div class="dsec">
+        <div class="h">What changed</div>
+        <div class="li"><span style="color:#3d6733;font-weight:700">•</span><div>Slide 5 — chart added and resized <span style="color:#a29d94">by me</span></div></div>
+        <div class="li"><span style="color:#3d6733;font-weight:700">•</span><div>Slides 2–4 — figures updated <span style="color:#a29d94">by me</span></div></div>
+        <div class="li"><span style="color:#5f5a53;font-weight:700">•</span><div>Slide 5 title reworded <span style="color:#a29d94">by you</span></div></div>
+        <div style="display:flex;gap:6px;margin-top:8px"><button class="btn sm">Undo mine</button><button class="btn sm">Review all</button></div>
+      </div>
+      <div class="dsec">
+        <div class="h">Where this came from</div>
+        <div class="li"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#77736b" stroke-width="1.8" style="margin-top:1px"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg><div>Q3 revenue model.xlsx — summary tab</div></div>
+        <div class="li"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#77736b" stroke-width="1.8" style="margin-top:1px"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg><div>Last quarter's board pack</div></div>
+      </div>
+      <div class="dsec">
+        <div class="h">Worth knowing</div>
+        <div class="li"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8a6414" stroke-width="2" style="margin-top:1px"><path d="M12 3 2 20h20L12 3z"/><path d="M12 9v4M12 16h.01"/></svg><div>I lightened the axis labels — the originals wouldn't read on a projector.</div></div>
+      </div>
+      <div class="dsec" style="border-bottom:0">
+        <div class="h">Versions</div>
+        <div class="li"><div style="flex:1">Now — regional split added</div></div>
+        <div class="li"><div style="flex:1">21:04 — you reworded slide 5</div><button class="btn sm">Go back</button></div>
+        <div class="li"><div style="flex:1">20:38 — first draft, 8 slides</div><button class="btn sm">Go back</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 19. FOCUS MODE ============ -->
+<div class="cap">S19 · Focus mode — both panels collapsed, just the document</div>
+<div class="frame wide" id="s19">
+  <div class="zl thin">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8580" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    <span class="g work" style="width:9px;height:9px"></span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a29d94" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b0821f" stroke-width="2.2"><path d="M12 3 2 20h20L12 3z"/></svg>
+  </div>
+  <div class="zc">
+    <div class="ctb">
+      <span style="font-size:12.5px;font-weight:650;margin-right:6px">Supplier agreement.docx</span>
+      <button class="btn sm" style="font-weight:700">B</button><button class="btn sm" style="font-style:italic">I</button>
+      <button class="btn sm">Heading</button><button class="btn sm">List</button><button class="btn sm">Table</button><button class="btn sm">Comment</button>
+      <div class="ml" style="display:flex;gap:6px;align-items:center"><span style="font-size:11.5px;color:#a29d94">Saved</span><button class="btn sm">Details</button></div>
+    </div>
+    <div class="canvas">
+      <div class="page" style="width:660px">
+        <div style="font-size:10.5px;color:#a29d94;margin-bottom:16px">Page 3 of 7</div>
+        <div style="font-weight:650;font-size:14px;margin-bottom:9px">8. Termination</div>
+        <div style="margin-bottom:11px">8.1 Either party may terminate this agreement for material breach that remains uncured for thirty (30) days after written notice from the party not in breach, specifying the nature of the breach and the remedy required.</div>
+        <div style="margin-bottom:11px">8.2 Termination shall not affect any accrued rights or liabilities of either party as at the date of termination, nor any provision expressly stated to survive termination.</div>
+        <div style="background:#eef4ea;border-left:2.5px solid #7fa06f;padding:9px 12px;margin:0 0 11px -12px;border-radius:0 4px 4px 0">
+          8.3 Either party may terminate this agreement for convenience by giving not less than sixty (60) days' written notice to the other party.
+        </div>
+        <div style="font-weight:650;font-size:14px;margin:20px 0 9px">9. Confidentiality</div>
+        <div style="margin-bottom:11px">9.1 Each party shall keep confidential all information disclosed by the other party in connection with this agreement, whether or not marked as confidential.</div>
+        <div style="margin-bottom:11px">9.2 The obligations in clause 9.1 shall survive termination for a period of three (3) years.</div>
+        <div style="color:#a29d94">9.3 Clause 9.1 does not apply to information that is or becomes public through no act of the receiving party.</div>
+      </div>
+    </div>
+  </div>
+  <div class="zr thin">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8a8580" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a29d94" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a29d94" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>
+  </div>
+</div>
+<!-- ============ 20. DOCUMENTS REPOSITORY ============ -->
+<div class="cap">S20 · Documents — a view over the real folder, with kinds as filters and threads as a second axis</div>
+<div class="frame" id="s20">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th on" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <div class="h2" style="margin:0">All files</div>
+      <div class="ml" style="display:flex;gap:7px"><button class="btn sm">New folder</button><button class="btn sm">Show in Finder</button></div>
+    </div>
+    <div class="crumb"><b>Documents › Work Studio</b> — 14 files, 2 folders on your Mac</div>
+    <div class="chips">
+      <span class="chip on">Everything</span><span class="chip">Documents</span><span class="chip">Decks</span>
+      <span class="chip">Spreadsheets</span><span class="chip">PDFs</span>
+      <div class="field ml" style="margin:0;width:150px;padding:5px 10px;font-size:12px;color:#a29d94">Search files…</div>
+    </div>
+    <div class="tbl">
+      <div class="hr"><div>Name</div><div>Changed</div><div>Used in</div><div>Versions</div></div>
+      <div class="r">
+        <div class="fn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#77736b" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <div><div class="nm2">Board packs</div><div class="sub">3 files</div></div></div>
+        <div class="mut">Yesterday</div><div class="mut">—</div><div class="mut">—</div>
+      </div>
+      <div class="r">
+        <div class="fn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#77736b" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <div><div class="nm2">Expenses</div><div class="sub">6 files · filled by Expense capture</div></div></div>
+        <div class="mut">6:40 am</div><div class="mut"><span class="lk">Expense capture</span></div><div class="mut">—</div>
+      </div>
+      <div class="r">
+        <div class="fn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#77736b" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>
+          <div><div class="nm2">Q3 revenue model.xlsx</div><div class="sub">You and I both edited it</div></div></div>
+        <div class="mut">20 min ago<div class="sub">by you</div></div>
+        <div class="mut"><span class="lk">Q3 revenue model</span><div class="sub"><span class="lk">Board deck — July</span></div></div>
+        <div class="mut">12</div>
+      </div>
+      <div class="r">
+        <div class="fn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#77736b" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg>
+          <div><div class="nm2">Board deck — July.pptx</div><div class="sub">Made from Q3 revenue model.xlsx</div></div></div>
+        <div class="mut">21:04<div class="sub">by me</div></div>
+        <div class="mut"><span class="lk">Board deck — July</span></div><div class="mut">4</div>
+      </div>
+      <div class="r">
+        <div class="fn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#77736b" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg>
+          <div><div class="nm2">Partnership agreement — draft 4.docx</div><div class="sub">Copy of draft 3, which kept your lawyer's markup</div></div></div>
+        <div class="mut">2 days ago<div class="sub">by you, in Word</div></div>
+        <div class="mut"><span class="lk">Partnership agreement</span></div><div class="mut">7</div>
+      </div>
+      <div class="r">
+        <div class="fn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#77736b" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg>
+          <div><div class="nm2">Weekly report — 19 Jul.docx</div><div class="sub">Written by Weekly report roll-up</div></div></div>
+        <div class="mut">Sun 08:00<div class="sub">by me</div></div>
+        <div class="mut"><span class="lk">Weekly report roll-up</span></div><div class="mut">1</div>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:14px">Folders here are real folders on your Mac. Move or rename them anywhere and I'll keep up.</div>
+  </div>
+</div>
+
+<!-- ============ 21. SETTINGS ============ -->
+<div class="cap">S21 · Settings — one screen, seven sections, no configuration ritual</div>
+<div class="frame" id="s21">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="on" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div class="h2">Settings</div>
+    <div class="subnav">
+      <div class="on">General</div><div>How I should work</div><div>Accounts</div>
+      <div>Files</div><div>Spending</div><div>Privacy</div>
+    </div>
+    <div class="srow">
+      <div class="lab"><div class="t2">Your AI key</div><div class="d2">Kept in your Mac keychain</div></div>
+      <div class="ctl" style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:12.5px">OpenAI — <span style="color:#3d6733;font-weight:600">working</span></span>
+        <button class="btn sm">Replace</button><button class="btn sm">Add another provider</button>
+      </div>
+    </div>
+    <div class="srow">
+      <div class="lab"><div class="t2">How hard to think</div><div class="d2">I pick the right level for each piece of work. This nudges it.</div></div>
+      <div class="ctl"><div class="segw"><div>Spend less</div><div class="on">Balanced</div><div>Best quality</div></div></div>
+    </div>
+    <div class="srow">
+      <div class="lab"><div class="t2">Start when I log in</div><div class="d2">Needed for work that runs to a schedule</div></div>
+      <div class="ctl"><div class="sw"></div></div>
+    </div>
+    <div class="srow">
+      <div class="lab"><div class="t2">Where your files live</div><div class="d2">Ordinary files you can open anywhere</div></div>
+      <div class="ctl" style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:12.5px">Documents › Work Studio</span><button class="btn sm">Change</button>
+      </div>
+    </div>
+    <div class="srow">
+      <div class="lab"><div class="t2">Daily limit</div><div class="d2">Scheduled work pauses if it's reached. Your own work never stops.</div></div>
+      <div class="ctl" style="display:flex;align-items:center;gap:10px">
+        <div class="field" style="margin:0;width:82px;padding:6px 10px;font-size:12.5px;color:#3d3933">$5.00</div>
+        <span style="font-size:12px;color:#a29d94">$0.62 used today</span>
+      </div>
+    </div>
+    <div class="srow">
+      <div class="lab"><div class="t2">Your data</div><div class="d2">Everything is on this computer</div></div>
+      <div class="ctl" style="display:flex;gap:8px;align-items:center">
+        <button class="btn sm">What leaves this computer</button><button class="btn sm">Export everything</button><button class="btn sm">Delete everything</button>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:16px">Something not working? <span class="lk">Technical details</span> — for support only.</div>
+  </div>
+</div>
+
+<!-- ============ 22. GLOBAL STEERING ============ -->
+<div class="cap">S22 · Settings › How I should work — global steering, scoped, with thread notes winning</div>
+<div class="frame" id="s22">
+  <div class="side">
+    <div class="brand">Zavora Work Studio</div>
+    <div class="nav">
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New work</a>
+      <a class="" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard<span class="b">3</span></a>
+    </div>
+    <div class="sect">Your work</div>
+    <div class="thlist">
+      <div class="th" tabindex="0" aria-label="Daily newsletter, Next tomorrow, 7:00 am"><span class="g sched" role="img" aria-label="Next tomorrow, 7:00 am"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="nm">Daily newsletter</span></div>
+      <div class="th" tabindex="0" aria-label="Inbox triage, Gmail needs reconnecting"><span class="g attn" role="img" aria-label="Gmail needs reconnecting"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3 2 20h20L12 3z"/></svg></span><span class="nm">Inbox triage</span></div>
+      <div class="th" tabindex="0" aria-label="Computer health, Checking now"><span class="g work" role="img" aria-label="Checking now"></span><span class="nm">Computer health</span></div>
+      <div class="th" tabindex="0" aria-label="Board deck — July, Finished 21:04"><span class="g done" role="img" aria-label="Finished 21:04"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Board deck — July</span></div>
+      <div class="th" tabindex="0" aria-label="Q3 revenue model, Finished yesterday"><span class="g done" role="img" aria-label="Finished yesterday"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span><span class="nm">Q3 revenue model</span></div>
+      <div class="th" tabindex="0" aria-label="Partnership agreement, You edited it 2 days ago"><span class="g work" role="img" aria-label="You edited it 2 days ago"></span><span class="nm">Partnership agreement</span></div>
+    </div>
+    <div class="sect">Documents</div>
+    <div class="thlist">
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l2-3h6l2 3"/></svg></span><span class="nm">All files</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v5h5"/><path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z"/></svg></span><span class="nm">Documents</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M9 21h6M12 17v4"/></svg></span><span class="nm">Decks</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="nm">Spreadsheets</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Board packs</span></div>
+      <div class="th" tabindex="0"><span class="fi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span><span class="nm">Expenses</span></div>
+    </div>
+    <div class="foot nav">
+      <a class="on" href="#"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 2.5 15a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21.5 11h.2a2 2 0 1 1 0 4z"/></svg>Settings</a>
+    </div>
+  </div>
+  <div class="main">
+    <div class="h2">Settings</div>
+    <div class="subnav">
+      <div>General</div><div class="on">How I should work</div><div>Accounts</div>
+      <div>Files</div><div>Spending</div><div>Privacy</div>
+    </div>
+    <div class="hint" style="margin:-4px 0 14px">This is everything I've learned about how you like things done. It applies to all your work. Change or delete any of it.</div>
+    <div class="gnote">
+      <span class="scope">Everything</span>
+      <div class="x2">Write plainly. No exclamation marks, no "excited to share".<div class="s" style="margin-top:3px">You told me on 12 July</div></div>
+      <button class="btn sm">Edit</button>
+    </div>
+    <div class="gnote">
+      <span class="scope">Decks</span>
+      <div class="x2">Use our brand colours — deep green and sand. Never the default blue.<div class="s" style="margin-top:3px">You told me on 14 July</div></div>
+      <button class="btn sm">Edit</button>
+    </div>
+    <div class="gnote">
+      <span class="scope">Decks</span>
+      <div class="x2">Put the ask on the last slide, not the first.<div class="s" style="margin-top:3px">You reordered two decks · 18 July</div></div>
+      <button class="btn sm">Edit</button>
+    </div>
+    <div class="gnote">
+      <span class="scope">Spreadsheets</span>
+      <div class="x2">Kenyan shillings, thousands separator, no decimals.<div class="s" style="margin-top:3px">You reformatted a sheet · 19 July</div></div>
+      <button class="btn sm">Edit</button>
+    </div>
+    <div class="gnote">
+      <span class="scope">Documents</span>
+      <div class="x2">Our legal entity is Zavora Logistics Ltd, not Zavora Ltd.<div class="s" style="margin-top:3px">You corrected me twice</div></div>
+      <button class="btn sm">Edit</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+      <div class="field" style="margin:0;flex:1;color:#a29d94">Tell me something new…</div>
+      <div class="segw"><div class="on">Everything</div><div>Documents</div><div>Decks</div><div>Sheets</div></div>
+    </div>
+    <div class="hint" style="margin-top:14px">If a single piece of work has its own instructions, those win over these.</div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,46 @@
+[package]
+name = "studio-runner"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# Implements the ADK-Rust confirmation contract. Requires the adk-rust workspace
+# beside this one. Off by default so the rules remain testable, and so CI does not
+# need the sibling checkout to verify them.
+adk = [
+  "dep:adk-core",
+  "dep:adk-agent",
+  "dep:adk-tool",
+  "dep:async-trait",
+  "dep:serde_json",
+  "dep:tokio",
+]
+
+[dependencies]
+rusqlite.workspace = true
+studio-artefacts.workspace = true
+studio-gate.workspace = true
+studio-jobs.workspace = true
+studio-store.workspace = true
+thiserror.workspace = true
+
+adk-core = { path = "../../../../adk-rust/adk-core", optional = true }
+adk-agent = { path = "../../../../adk-rust/adk-agent", optional = true }
+adk-tool = { path = "../../../../adk-rust/adk-tool", features = ["mcp"], optional = true }
+tokio = { workspace = true, optional = true }
+async-trait = { version = "0.1", optional = true }
+serde_json = { workspace = true, optional = true }
+
+[dev-dependencies]
+studio-decks.workspace = true
+studio-docs.workspace = true
+zavora-docx = { path = "../../../../zavora-docx/crates/zavora-docx" }
+zavora-slide = { path = "../../../../zavora-slide/crates/zavora-slide" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+serde_json.workspace = true
+zavora-xlsx = { path = "../../../../zavora-xlsx" }
+studio-sheets.workspace = true

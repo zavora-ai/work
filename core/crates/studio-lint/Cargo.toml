@@ -1,0 +1,15 @@
+[package]
+name = "studio-lint"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+regex.workspace = true
+studio-strings.workspace = true
+
+[[bin]]
+name = "vocab-lint"
+path = "src/bin/vocab-lint.rs"

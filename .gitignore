@@ -1,0 +1,27 @@
+# Rust
+core/target/
+**/*.rs.bk
+
+# Node / Electron shell
+node_modules/
+shell/dist/
+shell/release/
+shell/.vite/
+
+# Local runtime data — Jobs, runs, steering, Artefact metadata.
+# Never committed: it is the User's own work.
+.zws/
+*.db
+*.db-wal
+*.db-shm
+
+# Secrets. Credentials belong in the OS keychain, never in a file.
+.env
+.env.*
+!.env.example
+
+# Tooling
+.DS_Store
+.playwright-mcp/
+.playwright-cli/
+/tmp/
