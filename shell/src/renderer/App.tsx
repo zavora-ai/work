@@ -209,7 +209,7 @@ export function App() {
   };
 
   return (
-    <div className="app">
+    <div className={leftCollapsed ? "app rail-collapsed" : "app"}>
       <SkipLink />
       <LeftPanel
         route={route}

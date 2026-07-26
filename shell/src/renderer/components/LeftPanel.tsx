@@ -52,6 +52,39 @@ export interface Navigator {
   items: { label: string; on?: boolean; indent?: boolean; badge?: string }[];
 }
 
+/// How much room the window's own controls need at the top left.
+///
+/// The window is drawn with its title bar hidden, which is what gives the product the whole
+/// surface — but the close, minimise and zoom controls are still there, floating over whatever
+/// the interface puts underneath. The app name was landing at 20px from the top and 12 from the
+/// left, directly under them.
+///
+/// Reserved rather than nudged: the controls do not move, so the space they need is a fact about
+/// the window, not a matter of taste. 38 clears them with the margin macOS applications normally
+/// leave — 30 cleared them by about three pixels, which reads as a near miss rather than a
+/// decision.
+const WINDOW_CONTROLS = 38;
+
+/// The strip above everything, kept clear for the window's controls.
+///
+/// It is also the only place the window can be dragged by. Hiding the title bar removes the
+/// usual grab area, so without this the window could only be moved by the narrow margin macOS
+/// leaves beside the controls.
+function ControlsRoom() {
+  return (
+    <div
+      aria-hidden="true"
+      style={
+        {
+          height: WINDOW_CONTROLS,
+          flex: "0 0 auto",
+          WebkitAppRegion: "drag",
+        } as React.CSSProperties
+      }
+    />
+  );
+}
+
 export function LeftPanel({
   route,
   onNavigate,
@@ -86,11 +119,12 @@ export function LeftPanel({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          paddingTop: 12,
+          paddingTop: 0,
           gap: 14,
           flex: "0 0 auto",
         }}
       >
+        <ControlsRoom />
         <button
           type="button"
           onClick={onToggle}
@@ -114,13 +148,14 @@ export function LeftPanel({
         width: 206,
         background: "var(--card)",
         borderRight: "1px solid var(--border)",
-        padding: "20px 12px",
+        padding: "0 12px 20px",
         display: "flex",
         flexDirection: "column",
         flex: "0 0 auto",
         overflowY: "auto",
       }}
     >
+      <ControlsRoom />
       <div
         style={{
           fontWeight: 650,

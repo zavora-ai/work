@@ -34,11 +34,22 @@ sheet-server: ## Build the spreadsheet capability server the integration test ne
 guardrails: lint ## Every build-failing guardrail
 	cd $(CORE) && cargo test -p studio-lint -p studio-api
 
+# The crates this repository owns, asked of the workspace rather than written down. `--no-deps`
+# reports workspace members only, so a crate added tomorrow is formatted without anyone
+# remembering to add it here — and a list maintained by hand is how a new crate quietly stops
+# being checked.
+OURS := $(shell cd $(CORE) && cargo metadata --no-deps --format-version 1 \
+	| python3 -c "import json,sys; print(' '.join('-p ' + p['name'] for p in json.load(sys.stdin)['packages']))")
+
+# Our crates only. `--all` reaches through the path dependency on adk-model into the sibling
+# ADK-Rust checkout, so it would both reformat someone else's repository and fail our build for
+# their unformatted work in progress. A guardrail that fires on another project's source teaches
+# people to ignore it.
 fmt: ## Format
-	cd $(CORE) && cargo fmt --all
+	cd $(CORE) && cargo fmt $(OURS)
 
 fmt-check: ## Verify formatting
-	cd $(CORE) && cargo fmt --all -- --check
+	cd $(CORE) && cargo fmt $(OURS) -- --check
 
 clippy: ## Lint Rust
 	cd $(CORE) && cargo clippy --workspace --all-targets -- -D warnings

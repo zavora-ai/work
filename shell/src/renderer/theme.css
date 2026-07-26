@@ -109,6 +109,13 @@ button {
   overflow-y: auto;
 }
 
+/* The window's own controls float over the interface, and they are wider than the collapsed
+   rail — so with the rail narrow they reach across the left edge of this pane. The sidebar
+   reserves room for them; when it is too narrow to do so, this pane reserves it instead. */
+.rail-collapsed .main {
+  padding-top: 42px;
+}
+
 .h1 {
   font-size: 15px;
   font-weight: 650;
