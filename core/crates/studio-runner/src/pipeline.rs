@@ -177,7 +177,7 @@ impl ServerBinaries {
         Self {
             spreadsheet: at("mcp-servers/worksheet-mcp/target/debug/excel-mcp-server"),
             document: at("mcp-servers/docx-mcp/target/debug/docx-mcp-server"),
-            presentation: at("mcp-servers/mcp_slides/target/debug/slides-mcp-server"),
+            presentation: at("mcp-servers/mcp-slides/target/debug/slides-mcp-server"),
         }
     }
 

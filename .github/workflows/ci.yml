@@ -107,7 +107,7 @@ jobs:
         run: |
           cd ../mcp-servers/worksheet-mcp && cargo build --bin excel-mcp-server
           cd ../docx-mcp && cargo build --bin docx-mcp-server
-          cd ../mcp_slides && cargo build
+          cd ../mcp-slides && cargo build
 
       # Fails if any server exposes an operation nobody classified. Without the servers
       # built above these tests would skip, which is why the build step is not optional.

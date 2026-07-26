@@ -9,7 +9,7 @@
 //!
 //! ```sh
 //! cargo build --bin docx-mcp-server      # in mcp-servers/docx-mcp
-//! cargo build                            # in mcp-servers/mcp_slides
+//! cargo build                            # in mcp-servers/mcp-slides
 //! ```
 
 #![cfg(feature = "adk")]
@@ -33,7 +33,7 @@ fn document_server() -> Option<PathBuf> {
 }
 
 fn presentation_server() -> Option<PathBuf> {
-    binary("mcp-servers/mcp_slides/target/debug/slides-mcp-server")
+    binary("mcp-servers/mcp-slides/target/debug/slides-mcp-server")
 }
 
 /// Pull a handle out of whatever shape the server answered in.

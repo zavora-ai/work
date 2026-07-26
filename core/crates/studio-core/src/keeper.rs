@@ -406,7 +406,7 @@ impl Keeper {
             (
                 "presentations",
                 "Presentations",
-                "mcp-servers/mcp_slides/target/debug/slides-mcp-server",
+                "mcp-servers/mcp-slides/target/debug/slides-mcp-server",
                 "presentation",
             ),
         ] {
