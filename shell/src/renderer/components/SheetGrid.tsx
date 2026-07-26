@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { cellRef, columnName, type Cell, type GridModel, type Sheet } from "../../shared/grid.ts";
+import { ChartView } from "./ChartView.tsx";
 import { Field } from "./primitives.tsx";
 
 /// Whether the User was working in the grid when it was last taken down.
@@ -490,6 +491,17 @@ export function SheetGrid({
             scroller.current?.focus();
           }}
         />
+
+        {/* Below the grid rather than floating over the cells. The file records where a chart
+            sits, but the reader does not yet give that position back, and drawing a chart at a
+            guessed place would cover the User's own numbers. */}
+        {sheet.charts && sheet.charts.length > 0 ? (
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", padding: "14px 2px" }}>
+            {sheet.charts.map((chart, index) => (
+              <ChartView key={`${chart.title ?? "chart"}-${index}`} chart={chart} />
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div

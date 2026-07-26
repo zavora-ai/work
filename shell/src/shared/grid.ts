@@ -52,6 +52,28 @@ export interface Sheet {
   rows: Cell[][];
   merges: Merge[];
   columnWidths: (number | null)[];
+  /** The charts drawn on this sheet, with their numbers already resolved by the Core. */
+  charts?: Chart[];
+}
+
+/** One series of a chart. A missing value is null, not zero: a gap is not a measurement. */
+export interface ChartSeries {
+  name?: string;
+  labels: string[];
+  values: (number | null)[];
+}
+
+export interface Chart {
+  /** column, bar, line, pie, area, scatter — or "other" for one we cannot draw. */
+  kind: string;
+  title?: string;
+  acrossName?: string;
+  upName?: string;
+  atRow: number;
+  atCol: number;
+  width: number;
+  height: number;
+  series: ChartSeries[];
 }
 
 export interface GridModel {

@@ -141,6 +141,16 @@ pub enum SheetAction {
     Merge { range: String },
     /// Widen the columns to fit what is in them.
     FitColumns,
+    /// Draw a chart of a range, placed at a cell.
+    Chart {
+        /// `column`, `bar`, `line`, `pie` or `area`.
+        kind: String,
+        range: String,
+        at: String,
+        title: Option<String>,
+        /// True when the first row of the selection names the columns rather than holding data.
+        has_header: bool,
+    },
 }
 
 impl SheetAction {
@@ -153,6 +163,7 @@ impl SheetAction {
             Self::Freeze { .. } | Self::Unfreeze => "freeze_panes",
             Self::Merge { .. } => "merge_cells",
             Self::FitColumns => "autofit_columns",
+            Self::Chart { .. } => "add_chart",
         }
     }
 
@@ -197,6 +208,41 @@ impl SheetAction {
             Self::Unfreeze => serde_json::json!({ "sheet_name": sheet, "cell": "A1" }),
             Self::Merge { range } => serde_json::json!({ "sheet_name": sheet, "range": range }),
             Self::FitColumns => serde_json::json!({ "sheet_name": sheet }),
+            Self::Chart {
+                kind,
+                range,
+                at,
+                title,
+                has_header,
+            } => {
+                // Split into labels and numbers here rather than handing over the whole
+                // rectangle. Passing a plain range recorded one nameless series covering both
+                // columns, so the chart read back with no labels and no values — the first
+                // column was being charted as if it were data.
+                let (labels, values, names) = label_and_value_columns(sheet, range, *has_header);
+                // Two columns clear of the data. Anchoring at the selection itself would lay the
+                // chart over the numbers it is a chart of.
+                let placed = beside(range).unwrap_or_else(|| at.clone());
+                serde_json::json!({
+                    "sheet_name": sheet,
+                    "chart_type": kind,
+                    "series": values
+                        .iter()
+                        .zip(names.iter())
+                        .map(|(column, name)| serde_json::json!({
+                            "values": column,
+                            "categories": labels,
+                            "name": name,
+                        }))
+                        .collect::<Vec<_>>(),
+                    "cell": placed,
+                    "title": title,
+                    // A size that covers about six columns and twelve rows, which is what a
+                    // person means by "a chart of this" without saying how big.
+                    "width": 480,
+                    "height": 288,
+                })
+            }
         }
     }
 
@@ -216,8 +262,167 @@ impl SheetAction {
             Self::Unfreeze => "you unfroze the headings".to_string(),
             Self::Merge { range } => format!("you merged {range}"),
             Self::FitColumns => "you fitted the columns".to_string(),
+            Self::Chart { kind, range, .. } => format!("you added a {kind} chart of {range}"),
         }
     }
+}
+
+/// Turn a reply that says "error" into one.
+///
+/// The capability servers answer with a status in the body rather than by failing the call, which
+/// is reasonable of them and means a caller that only checks for transport failure sees every
+/// refusal as a success.
+fn refusal_in(answer: &str) -> Result<(), RunError> {
+    // The reply arrives wrapped: a JSON value whose text is itself JSON, sometimes inside a
+    // content array. So the status is looked for wherever it is, rather than assumed to be at the
+    // top — which is why the first version of this check passed every refusal through.
+    fn refusal_within(value: &serde_json::Value) -> Option<String> {
+        match value {
+            serde_json::Value::String(text) => serde_json::from_str::<serde_json::Value>(text)
+                .ok()
+                .and_then(|inner| refusal_within(&inner)),
+            serde_json::Value::Object(map) => {
+                if map.get("status").and_then(|status| status.as_str()) == Some("error") {
+                    return Some(
+                        map.get("message")
+                            .and_then(|message| message.as_str())
+                            .unwrap_or("the connection refused it")
+                            .to_string(),
+                    );
+                }
+                map.values().find_map(refusal_within)
+            }
+            serde_json::Value::Array(items) => items.iter().find_map(refusal_within),
+            _ => None,
+        }
+    }
+
+    let Ok(body) = serde_json::from_str::<serde_json::Value>(answer) else {
+        // Not JSON at all. Nothing to object to.
+        return Ok(());
+    };
+    match refusal_within(&body) {
+        Some(detail) => Err(RunError::Failed { detail }),
+        None => Ok(()),
+    }
+}
+
+/// A selection split into its label column and its number columns.
+///
+/// "A5:C8" becomes labels in A5:A8 and numbers in B5:B8 and C5:C8 — which is what a spreadsheet
+/// does when asked to chart a block, because the leftmost column of a table is what the rows are
+/// called. A single-column selection has no labels, only numbers.
+#[allow(clippy::type_complexity)]
+fn label_and_value_columns(
+    sheet: &str,
+    range: &str,
+    has_header: bool,
+) -> (Option<String>, Vec<String>, Vec<Option<String>>) {
+    let nothing = |range: &str| (None, vec![qualified(sheet, range, range)], vec![None]);
+
+    let Some((start, end)) = range.split_once(':') else {
+        return nothing(range);
+    };
+    let (Some((first_row, first_col)), Some((last_row, last_col))) =
+        (position_in(start), position_in(end))
+    else {
+        return (None, vec![qualified(sheet, start, end)], vec![None]);
+    };
+
+    let (mut top, bottom) = (first_row.min(last_row), first_row.max(last_row));
+    let (left, right) = (first_col.min(last_col), first_col.max(last_col));
+
+    // The header row names the columns; charting it as a data point puts a bar of nothing at the
+    // front of every series.
+    let heading_row = top;
+    if has_header && bottom > top {
+        top += 1;
+    }
+
+    if left == right {
+        return (
+            None,
+            vec![qualified(
+                sheet,
+                &cell_name(top, left),
+                &cell_name(bottom, left),
+            )],
+            vec![has_header.then(|| {
+                qualified(
+                    sheet,
+                    &cell_name(heading_row, left),
+                    &cell_name(heading_row, left),
+                )
+            })],
+        );
+    }
+
+    let labels = qualified(sheet, &cell_name(top, left), &cell_name(bottom, left));
+    let values: Vec<String> = (left + 1..=right)
+        .map(|col| qualified(sheet, &cell_name(top, col), &cell_name(bottom, col)))
+        .collect();
+    let names = (left + 1..=right)
+        .map(|col| {
+            has_header.then(|| {
+                qualified(
+                    sheet,
+                    &cell_name(heading_row, col),
+                    &cell_name(heading_row, col),
+                )
+            })
+        })
+        .collect();
+    (Some(labels), values, names)
+}
+
+/// A cell two columns right of a range's right edge, level with its top.
+fn beside(range: &str) -> Option<String> {
+    let (start, end) = range.split_once(':')?;
+    let (top, left) = position_in(start)?;
+    let (_, right) = position_in(end)?;
+    Some(cell_name(top, left.max(right).saturating_add(2)))
+}
+
+/// A range written the way a chart records one: with its sheet, and absolute.
+fn qualified(sheet: &str, start: &str, end: &str) -> String {
+    let plain = |reference: &str| reference.replace('$', "");
+    format!("{sheet}!{}:{}", plain(start), plain(end))
+}
+
+fn cell_name(row: u32, col: u16) -> String {
+    let mut letters = String::new();
+    let mut remaining = col as u32 + 1;
+    while remaining > 0 {
+        let step = (remaining - 1) % 26;
+        letters.insert(0, (b'A' + step as u8) as char);
+        remaining = (remaining - 1) / 26;
+    }
+    format!("{letters}{}", row + 1)
+}
+
+/// "$B$6" or "B6" as row and column, counting from zero.
+fn position_in(reference: &str) -> Option<(u32, u16)> {
+    let plain: String = reference.chars().filter(|c| *c != '$').collect();
+    let letters: String = plain
+        .chars()
+        .take_while(|c| c.is_ascii_alphabetic())
+        .collect();
+    let digits: String = plain
+        .chars()
+        .skip(letters.len())
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    if letters.is_empty() || digits.is_empty() {
+        return None;
+    }
+    let mut col: u32 = 0;
+    for letter in letters.to_ascii_uppercase().chars() {
+        col = col * 26 + (letter as u32 - 'A' as u32 + 1);
+    }
+    Some((
+        digits.parse::<u32>().ok()?.checked_sub(1)?,
+        u16::try_from(col.checked_sub(1)?).ok()?,
+    ))
 }
 
 /// What a run cost, as the provider counted it.
@@ -768,18 +973,23 @@ impl Engine {
             object.insert("workbook_id".to_string(), serde_json::json!(handle));
         }
 
-        server
+        let answer = server
             .call(operation, arguments)
             .await
             .map_err(|detail| RunError::Failed { detail })?;
+        // The call succeeding is not the operation succeeding. Every reply carries a status, and
+        // a refusal comes back as a perfectly well-delivered message saying no — so without this
+        // the interface reported "you added a chart" for a chart that was never added.
+        refusal_in(&answer)?;
 
-        server
+        let saved = server
             .call(
                 "save_workbook",
                 serde_json::json!({ "workbook_id": handle, "file_path": path }),
             )
             .await
             .map_err(|detail| RunError::Failed { detail })?;
+        refusal_in(&saved)?;
         Ok(())
     }
 

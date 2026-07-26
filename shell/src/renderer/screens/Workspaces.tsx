@@ -429,6 +429,15 @@ export function SpreadsheetWorkspace(
           >
             Fit
           </Button>
+          <Button
+            small
+            title="Chart the selection, with its first row as the column names"
+            onClick={() =>
+              void doToSheet("chart", { by: "column", hasHeader: true, title: undefined })
+            }
+          >
+            Chart
+          </Button>
           <Button small title="Bold" onClick={() => void applyFormat({ bold: true })}>
             B
           </Button>

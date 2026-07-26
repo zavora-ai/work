@@ -595,6 +595,9 @@ pub struct SheetActionRequest {
     pub descending: bool,
     #[serde(default)]
     pub has_header: bool,
+    /// A heading, for a chart.
+    #[serde(default)]
+    pub title: Option<String>,
     pub thread: Option<String>,
 }
 
@@ -645,6 +648,22 @@ async fn act_on_sheet(
             range: body.range.clone().unwrap_or_default(),
         },
         "fit columns" => SheetAction::FitColumns,
+        "chart" => SheetAction::Chart {
+            // Column unless told otherwise: it is the kind that reads correctly for the most
+            // data, and a wrong choice here is a chart the User has to delete.
+            kind: body.by.clone().unwrap_or_else(|| "column".to_string()),
+            range: body.range.clone().unwrap_or_default(),
+            // A cell, not a column letter. `at` carries a column for the column actions, and
+            // sending that to a chart put "A" where a cell reference belongs — which the
+            // connection refused while the interface said the chart had been added.
+            at: format!(
+                "{}{}",
+                body.at.clone().unwrap_or_else(|| "H".to_string()),
+                body.at_row.unwrap_or(2)
+            ),
+            title: body.title.clone(),
+            has_header: body.has_header,
+        },
         // An action nobody offers is refused rather than approximated.
         other => {
             return problem(

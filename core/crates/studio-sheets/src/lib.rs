@@ -23,6 +23,7 @@
 use serde::{Deserialize, Serialize};
 use zavora_xlsx::{CellValue, Workbook};
 
+pub mod charts;
 pub mod format;
 pub mod numbers;
 
@@ -128,6 +129,10 @@ pub struct Sheet {
     pub merges: Vec<Merge>,
     /// Column widths, where the file sets them.
     pub column_widths: Vec<Option<f64>>,
+    /// The charts drawn on this sheet, with their numbers already resolved. Empty for a sheet
+    /// with none, so the interface draws nothing rather than a chart of nothing.
+    #[serde(default)]
+    pub charts: Vec<crate::charts::Drawing>,
 }
 
 impl Sheet {
@@ -211,6 +216,22 @@ pub fn read(path: &std::path::Path, window: Window) -> Result<GridModel> {
         sheets.push(read_sheet(worksheet, window));
     }
 
+    // Charts second, because a series can point at a range on another sheet and resolving it
+    // needs every sheet already read. Doing it in the first pass would give a chart of a sheet
+    // that had not been looked at yet — which is to say, a chart of nothing.
+    let mut drawings = Vec::with_capacity(names.len());
+    for index in 0..names.len() {
+        let worksheet = workbook
+            .worksheet_ref(index)
+            .map_err(|e| SheetError::Open {
+                detail: e.to_string(),
+            })?;
+        drawings.push(charts::drawings_on(worksheet, &sheets));
+    }
+    for (sheet, found) in sheets.iter_mut().zip(drawings) {
+        sheet.charts = found;
+    }
+
     // Open on the first sheet that has something in it. A workbook often carries an
     // empty leading sheet, and landing the User on it makes their own file look lost.
     let active = sheets
@@ -238,6 +259,8 @@ fn read_sheet(worksheet: &zavora_xlsx::Worksheet, window: Window) -> Sheet {
             rows: Vec::new(),
             merges: Vec::new(),
             column_widths: Vec::new(),
+            // Filled in a second pass, once every sheet has been read.
+            charts: Vec::new(),
         };
     };
 
@@ -275,6 +298,7 @@ fn read_sheet(worksheet: &zavora_xlsx::Worksheet, window: Window) -> Sheet {
         rows,
         merges,
         column_widths,
+        charts: Vec::new(),
     }
 }
 
