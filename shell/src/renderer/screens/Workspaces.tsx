@@ -245,6 +245,12 @@ export function SpreadsheetWorkspace(
   // act until it knows one.
   const [selection, setSelection] = useState<{ sheet: string; range: string } | undefined>();
 
+  const undoLast = async () => {
+    if (!props.path) return;
+    await window.studio?.undo?.({ path: props.path, thread: props.thread ?? "spreadsheet" });
+    setEditedAt(Date.now());
+  };
+
   const applyFormat = async (how: Record<string, unknown>) => {
     if (!props.path || !selection) return;
     await window.studio?.format?.({
@@ -297,6 +303,7 @@ export function SpreadsheetWorkspace(
           : undefined
       }
       onSelection={(sheet, range) => setSelection({ sheet, range })}
+      onUndo={props.path ? () => void undoLast() : undefined}
       onEditMany={
         props.path
           ? (sheetName, cells) => {
@@ -330,6 +337,9 @@ export function SpreadsheetWorkspace(
               now acts on whatever is selected, through the same gate and history as every
               other change. Chart and Pivot are not here because they are not built: an
               absent control is better than one that lies. */}
+          <Button small title="Undo the last change" onClick={() => void undoLast()}>
+            Undo
+          </Button>
           <Button small title="Bold" onClick={() => void applyFormat({ bold: true })}>
             B
           </Button>

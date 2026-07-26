@@ -78,6 +78,9 @@ export interface StudioBridge {
    *
    * Goes the same way an agent's change does, so one history holds both.
    */
+  /** Put the last change to this file back. */
+  undo(body: { path: string; thread?: string }): Promise<unknown>;
+
   /** Change how a range looks. The same gate and history as any other change. */
   format(body: {
     path: string;

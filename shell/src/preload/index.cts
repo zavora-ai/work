@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld("studio", {
   }) => ipcRenderer.invoke("core:addCapability", body),
   capabilityAction: (body: { id: string; action: string; agents?: string[] }) =>
     ipcRenderer.invoke("core:capabilityAction", body),
+  undo: (body: { path: string; thread?: string }) => ipcRenderer.invoke("core:undo", body),
   format: (body: {
     path: string;
     sheet: string;

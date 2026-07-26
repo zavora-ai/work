@@ -436,6 +436,79 @@ impl Keeper {
     /// One history for both authors: a cell the User typed and a column a specialist added are
     /// the same kind of thing (Property 23). Nothing was writing to it, so the change log was
     /// empty and "Done today" could only ever read zero.
+    /// Record a change together with what it replaced, so it can be undone.
+    ///
+    /// `before` holds the cells as they were, in the file's own terms. A change recorded without
+    /// it can still be shown in the history; it just cannot be reversed, and the interface is
+    /// told which is which rather than offering an undo that fails.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn record_undoable_change(
+        &self,
+        path: &str,
+        description: &str,
+        by_user: bool,
+        where_at: &str,
+        before: &[(String, String)],
+    ) {
+        self.record_change(path, description, by_user);
+        if before.is_empty() {
+            return;
+        }
+        let Ok(store) = self.store.lock() else { return };
+        let cells = serde_json::to_string(before).unwrap_or_default();
+        let id = format!("art-{:x}", fnv(path));
+        // Keyed on (artefact_id, seq), which is this table's own primary key. An earlier version
+        // used rowid and the wrong column name, and every failure was swallowed by a `.ok()` —
+        // so undo simply reported nothing to undo, having recorded nothing.
+        if let Err(error) = store.conn().execute(
+            "UPDATE artefact_changes SET undo_cells = ?1, undo_where = ?2
+             WHERE artefact_id = ?3
+               AND seq = (SELECT max(seq) FROM artefact_changes WHERE artefact_id = ?3)",
+            rusqlite::params![cells, where_at, id],
+        ) {
+            eprintln!("[core] this change cannot be undone: {error}");
+        }
+    }
+
+    /// The most recent change to this file that can be undone.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn last_undoable(&self, path: &str) -> Option<Undoable> {
+        let store = self.store.lock().ok()?;
+        let id = format!("art-{:x}", fnv(path));
+        let row: Option<(String, String, String)> = store
+            .conn()
+            .query_row(
+                "SELECT description, undo_where, undo_cells FROM artefact_changes
+                 WHERE artefact_id = ?1 AND undo_cells IS NOT NULL
+                 ORDER BY seq DESC LIMIT 1",
+                [&id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .ok();
+        let (what, where_at, cells) = row?;
+        let before: Vec<(String, String)> = serde_json::from_str(&cells).ok()?;
+        Some(Undoable {
+            what,
+            where_at,
+            before,
+        })
+    }
+
+    /// Forget an undo once it has been used, so pressing undo twice steps further back rather
+    /// than putting the same values in again.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn undo_used(&self, path: &str) {
+        let Ok(store) = self.store.lock() else { return };
+        let id = format!("art-{:x}", fnv(path));
+        let _ = store.conn().execute(
+            "UPDATE artefact_changes SET undo_cells = NULL
+             WHERE artefact_id = ?1
+               AND seq = (SELECT max(seq) FROM artefact_changes
+                          WHERE artefact_id = ?1 AND undo_cells IS NOT NULL)",
+            [&id],
+        );
+    }
+
     #[cfg_attr(not(feature = "adk"), allow(dead_code))]
     pub fn record_change(&self, path: &str, description: &str, by_user: bool) {
         let Ok(store) = self.store.lock() else { return };
@@ -641,6 +714,17 @@ fn scope_from(applies_to: Option<&str>) -> Scope {
         Some("spreadsheet") | Some("spreadsheets") => Scope::Spreadsheet,
         _ => Scope::Everything,
     }
+}
+
+/// A change that can be put back, and what putting it back means.
+#[cfg_attr(not(feature = "adk"), allow(dead_code))]
+pub struct Undoable {
+    /// What the change was, in the words the history shows.
+    pub what: String,
+    /// The sheet the cells belong to.
+    pub where_at: String,
+    /// The cells and the values they held before.
+    pub before: Vec<(String, String)>,
 }
 
 /// A stable identifier for a path. FNV-1a, so the same file is the same Artefact next run.

@@ -17,6 +17,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cellRef, columnName, type Cell, type GridModel, type Sheet } from "../../shared/grid.ts";
 import { Field } from "./primitives.tsx";
 
+/// Whether the User was working in the grid when it was last taken down.
+///
+/// Editing a cell reloads the file, which remounts this component and drops the focus with it —
+/// so the next key after an edit went nowhere, and undo appeared not to work. Kept outside the
+/// component because that is the only thing that survives the remount. Not focused unless the
+/// grid had focus already: taking it while the User is typing in the chat box would be worse
+/// than losing it.
+let wasWorkingHere = false;
+
 const ROW_HEADER = 44;
 const DEFAULT_COLUMN = 96;
 const ROW_HEIGHT = 25;
@@ -49,6 +58,7 @@ export function SheetGrid({
   onEdit,
   onEditMany,
   onSelection,
+  onUndo,
 }: {
   model: GridModel;
   /** A short aside for the sheet strip, where there is room for it. */
@@ -67,6 +77,8 @@ export function SheetGrid({
    * controls for it live above the file, not inside the grid.
    */
   onSelection?: (sheet: string, range: string) => void;
+  /** Put the last change back. Absent where the file cannot be written. */
+  onUndo?: () => void;
 }) {
   const [active, setActive] = useState(model.active);
   // What the User has typed but not yet committed. Undefined means "showing the cell".
@@ -122,6 +134,9 @@ export function SheetGrid({
       onEdit(sheet.name, cellRef(selected.row, selected.col), value);
       setTyped(undefined);
       setEditingInCell(false);
+      // The input that took the typing is about to be unmounted. Without this the focus falls to
+      // the document and the next key — an arrow, or undo — goes nowhere.
+      scroller.current?.focus();
       if (thenMove === "down") move(1, 0, false);
       else if (thenMove === "across") move(0, 1, false);
     },
@@ -267,6 +282,12 @@ export function SheetGrid({
         break;
     }
 
+    if (meta && (event.key === "z" || event.key === "Z") && onUndo) {
+      event.preventDefault();
+      onUndo();
+      return;
+    }
+
     if (meta && (event.key === "a" || event.key === "A")) {
       event.preventDefault();
       setAnchor({ row: sheet.firstRow, col: sheet.firstCol });
@@ -285,6 +306,11 @@ export function SheetGrid({
       setEditingInCell(true);
     }
   };
+
+  // Focus put back after the remount an edit causes, and only if it was here before.
+  useEffect(() => {
+    if (wasWorkingHere) scroller.current?.focus();
+  }, []);
 
   // Copy and paste are document-level events, so they are taken from the window while the grid
   // holds focus rather than from a hidden textarea.
@@ -395,6 +421,13 @@ export function SheetGrid({
         // The grid takes the keyboard as a whole. Without a tabbable container the arrows would
         // scroll the pane instead of moving the selection.
         tabIndex={0}
+        onFocus={() => {
+          wasWorkingHere = true;
+        }}
+        onBlur={(event) => {
+          // Still here if the focus went to a cell's own input.
+          if (!event.currentTarget.contains(event.relatedTarget as Node)) wasWorkingHere = false;
+        }}
         onKeyDown={onKeyDown}
         style={{ flex: 1, minHeight: 0, overflow: "auto", outline: "none" }}
       >

@@ -281,6 +281,7 @@ pub fn router(api: Arc<Api>) -> Router {
         // The User's own edit. Same path as an agent's, which is the point.
         .route("/edit", axum::routing::post(edit))
         .route("/format", axum::routing::post(format_cells))
+        .route("/undo", axum::routing::post(undo))
         // What each specialist may reach, and which of those are on.
         .route("/capabilities", get(capabilities).post(add_capability))
         .route("/capabilities/act", axum::routing::post(act_on_capability))
@@ -566,6 +567,131 @@ pub struct MoreCells {
     pub value: String,
 }
 
+/// The values a set of cells holds now, for putting back later.
+///
+/// A formula is recorded as its formula, not its result: undoing a change to a cell that held
+/// `=SUM(B2:B9)` has to give back the sum, not the number it happened to show.
+#[cfg(feature = "adk")]
+fn cells_as_they_are(
+    path: &str,
+    sheet: &str,
+    changes: &[(String, String)],
+) -> Vec<(String, String)> {
+    let Ok(model) = studio_sheets::read(
+        std::path::Path::new(path),
+        studio_sheets::Window {
+            max_rows: 100_000,
+            max_cols: 1_000,
+        },
+    ) else {
+        return Vec::new();
+    };
+    let Some(found) = model
+        .sheets
+        .iter()
+        .find(|candidate| candidate.name == sheet)
+    else {
+        return Vec::new();
+    };
+
+    changes
+        .iter()
+        .map(|(reference, _)| {
+            let was = at_reference(found, reference)
+                .map(|cell| cell.formula.clone().unwrap_or_else(|| cell.display.clone()))
+                .unwrap_or_default();
+            (reference.clone(), was)
+        })
+        .collect()
+}
+
+/// The cell a reference like "B6" names, in a sheet the Core has read.
+///
+/// The window a sheet was read with starts where its used range starts, so "B6" is not row 6 of
+/// the rows we hold — a mistake that would record the wrong value as the one to put back.
+#[cfg(feature = "adk")]
+fn at_reference<'a>(
+    sheet: &'a studio_sheets::Sheet,
+    reference: &str,
+) -> Option<&'a studio_sheets::Cell> {
+    let letters: String = reference
+        .chars()
+        .take_while(|c| c.is_ascii_alphabetic())
+        .collect();
+    let digits: String = reference
+        .chars()
+        .skip(letters.len())
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    if letters.is_empty() || digits.is_empty() {
+        return None;
+    }
+
+    let mut col: u32 = 0;
+    for letter in letters.to_ascii_uppercase().chars() {
+        col = col * 26 + (letter as u32 - 'A' as u32 + 1);
+    }
+    let col = (col - 1) as u16;
+    let row = digits.parse::<u32>().ok()?.checked_sub(1)?;
+
+    sheet.at(row, col)
+}
+
+/// Put the last change back.
+#[cfg(feature = "adk")]
+async fn undo(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<UndoRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(engine) = api.engine() else {
+        return problem("Work Studio cannot change that file yet".into(), None);
+    };
+    let Some(keeper) = api.keeper.as_ref() else {
+        return problem("Nothing is being kept this session".into(), None);
+    };
+    let Some(undoable) = keeper.last_undoable(&body.path) else {
+        return problem("There is nothing to undo".into(), None);
+    };
+    let what = undoable.what;
+
+    match engine
+        .edit_many_by_hand(&body.path, &undoable.where_at, &undoable.before)
+        .await
+    {
+        Ok(()) => {
+            keeper.undo_used(&body.path);
+            // The undo is itself a change, and it says what it undid. A history that hides its
+            // own corrections is a history the User cannot trust.
+            keeper.record_change(&body.path, &format!("you undid: {what}"), true);
+            keeper.log("action", &format!("you undid: {what}"));
+            Json(serde_json::json!({ "done": true, "undid": what })).into_response()
+        }
+        Err(error) => problem(error.to_string(), error.detail()),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UndoRequest {
+    pub path: String,
+    pub thread: Option<String>,
+}
+
+#[cfg(not(feature = "adk"))]
+async fn undo(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(_body): Json<UndoRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    problem("Work Studio cannot change that file yet".into(), None)
+}
+
 /// A change the User made by hand.
 ///
 /// It goes through the same dispatcher an agent's change does, with the author set to the
@@ -585,6 +711,11 @@ async fn edit(
     let mut changes = vec![(body.cell.clone(), body.value.clone())];
     changes.extend(body.more.iter().map(|c| (c.cell.clone(), c.value.clone())));
 
+    // What is there now, read before the write, so the change can be undone. Read from the file
+    // rather than from what the interface believed was on screen: the two can differ, and the
+    // one that matters is the file.
+    let before = cells_as_they_are(&body.path, &body.sheet, &changes);
+
     match engine
         .edit_many_by_hand(&body.path, &body.sheet, &changes)
         .await
@@ -603,7 +734,7 @@ async fn edit(
                         body.sheet
                     )
                 };
-                keeper.record_change(&body.path, &what, true);
+                keeper.record_undoable_change(&body.path, &what, true, &body.sheet, &before);
                 keeper.log("action", &what);
                 if let Some(thread) = body.thread.as_deref() {
                     let _ = keeper.ensure_thread(thread, "Editing by hand", Some(&body.path));
