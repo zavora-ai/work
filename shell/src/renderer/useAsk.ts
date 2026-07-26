@@ -9,7 +9,7 @@
  * are all the Core's answers; this only shows them.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface Turn {
   /** Who said it. */
@@ -60,6 +60,30 @@ export function useAsk(path: string | undefined, thread: string) {
   });
   // The resume point, so each poll asks only for what it has not seen.
   const since = useRef(0);
+
+  // What was said before. Returning to a piece of work should not begin again: the turns are
+  // kept by the Core, and without this the panel came back empty even though they were there.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const bridge = typeof window === "undefined" ? undefined : window.studio;
+      if (!bridge?.thread) return;
+      try {
+        const answer = (await bridge.thread(thread)) as { turns?: Turn[] } | undefined;
+        if (cancelled) return;
+        const turns = answer?.turns ?? [];
+        if (turns.length > 0) {
+          setState((s) => (s.turns.length === 0 ? { ...s, turns } : s));
+        }
+      } catch {
+        // Not being able to read the conversation is not worth an error the User can do
+        // nothing about; the panel simply starts empty.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [thread]);
 
   const ask = useCallback(
     async (asked: string) => {

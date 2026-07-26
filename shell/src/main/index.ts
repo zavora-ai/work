@@ -150,6 +150,33 @@ app.whenReady().then(async () => {
     return result.filePaths[0];
   });
 
+  ipcMain.handle("core:edit", (_event, body: unknown) => corePost("/edit", body));
+
+  ipcMain.handle("core:files", (_event, within: unknown) =>
+    coreFetch(
+      typeof within === "string" && within
+        ? `/files?within=${encodeURIComponent(within)}`
+        : "/files",
+    ),
+  );
+
+  ipcMain.handle("core:newFolder", (_event, body: unknown) => corePost("/folder", body));
+
+  ipcMain.handle("core:threads", () => coreFetch("/threads"));
+
+  ipcMain.handle("core:thread", (_event, id: unknown) => {
+    if (typeof id !== "string") throw new Error("a piece of work is needed");
+    return coreFetch(`/thread?thread=${encodeURIComponent(id)}`);
+  });
+
+  ipcMain.handle("core:steering", (_event, id: unknown) =>
+    coreFetch(typeof id === "string" && id ? `/steering?thread=${encodeURIComponent(id)}` : "/steering"),
+  );
+
+  ipcMain.handle("core:addNote", (_event, body: unknown) => corePost("/steering", body));
+
+  ipcMain.handle("core:noteAction", (_event, body: unknown) => corePost("/steering/act", body));
+
   ipcMain.handle("core:ask", (_event, request: unknown) => {
     if (typeof request !== "object" || request === null) {
       throw new Error("a request is needed");

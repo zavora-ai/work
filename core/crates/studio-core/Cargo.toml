@@ -19,6 +19,9 @@ serde_json.workspace = true
 studio-api.workspace = true
 studio-decks.workspace = true
 studio-docs.workspace = true
+studio-artefacts.workspace = true
+studio-steering.workspace = true
+rusqlite.workspace = true
 studio-jobs.workspace = true
 studio-runner = { workspace = true, optional = true }
 studio-router = { workspace = true, optional = true }

@@ -43,6 +43,31 @@ export interface StudioBridge {
    * Answers when the work is finished. Progress arrives on the event stream in the
    * meantime, because the work takes long enough that silence would read as a hang.
    */
+  /**
+   * A change the User made by hand.
+   *
+   * Goes the same way an agent's change does, so one history holds both.
+   */
+  edit(body: {
+    path: string;
+    sheet: string;
+    cell: string;
+    value: string;
+    thread?: string;
+  }): Promise<unknown>;
+
+  /** What is really in the User's folder. */
+  files(within?: string): Promise<unknown>;
+  newFolder(body: { name: string; within?: string }): Promise<unknown>;
+  /** The pieces of work the User has done. */
+  threads(): Promise<unknown>;
+  /** One piece of work: what was said, and what Work Studio goes on. */
+  thread(id: string): Promise<unknown>;
+  steering(id?: string): Promise<unknown>;
+  addNote(body: { note: string; thread?: string }): Promise<unknown>;
+  /** Accept, reword, stop or forget a note. */
+  noteAction(body: { id: string; action: string; text?: string }): Promise<unknown>;
+
   ask(request: { asked: string; path: string; thread?: string }): Promise<unknown>;
 
   sheet(path: string): Promise<unknown>;

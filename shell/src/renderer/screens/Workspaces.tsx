@@ -16,6 +16,8 @@ import React, { useState } from "react";
 import { useSheet } from "../useSheet.ts";
 import type { DeckState, DocumentState } from "../useArtefact.ts";
 import { useAsk, type Turn } from "../useAsk.ts";
+import { useSteering } from "../useOwn.ts";
+import { SteeringPanel } from "../components/SteeringPanel.tsx";
 import { t } from "../../shared/strings.ts";
 import { Button, Card, Field, Icon } from "../components/primitives.tsx";
 import { SheetGrid } from "../components/SheetGrid.tsx";
@@ -174,10 +176,17 @@ function DocumentDetails(props: {
   );
 }
 
-export function SpreadsheetWorkspace(props: WorkspaceProps & { path?: string }) {
-  const conversation = useAsk(props.path, "spreadsheet");
+export function SpreadsheetWorkspace(props: WorkspaceProps & { path?: string; thread?: string }) {
+  const conversation = useAsk(props.path, props.thread ?? "spreadsheet");
+  // What Work Studio goes on, refetched after every change so an accepted note shows at once.
+  const steering = useSteering(
+    props.thread ?? "spreadsheet",
+    conversation.state.changedAt,
+  );
+  // Bumped when the User changes a cell themselves.
+  const [editedAt, setEditedAt] = useState(0);
   // Reload the grid when Work Studio has changed the file.
-  const sheet = useSheet(props.path, conversation.state.changedAt);
+  const sheet = useSheet(props.path, Math.max(conversation.state.changedAt, editedAt));
 
   const canvas = sheet.loading ? (
     <div style={{ width: 420, alignSelf: "flex-start" }}>
@@ -188,7 +197,27 @@ export function SpreadsheetWorkspace(props: WorkspaceProps & { path?: string }) 
       <Failure kind="userActionable" headline={sheet.problem} action="Choose another file" />
     </div>
   ) : sheet.model ? (
-    <SheetGrid model={sheet.model} note={t("doc.recalc_here")} />
+    <SheetGrid
+      model={sheet.model}
+      note={t("doc.recalc_here")}
+      onEdit={
+        props.path
+          ? (sheetName, cell, value) => {
+              void (async () => {
+                await window.studio?.edit?.({
+                  path: props.path!,
+                  sheet: sheetName,
+                  cell,
+                  value,
+                  thread: props.thread ?? "spreadsheet",
+                });
+                // Reload so the number on screen is the number in the file.
+                setEditedAt(Date.now());
+              })();
+            }
+          : undefined
+      }
+    />
   ) : null;
 
   return (
@@ -223,28 +252,14 @@ export function SpreadsheetWorkspace(props: WorkspaceProps & { path?: string }) 
         />
       }
       details={
-        <div>
-          <DetailsSection label={t("details.what_changed")}>
-            <DetailsLine>
-              <span style={{ color: "var(--live-fg)", fontWeight: 700 }}>•</span>
-              <div>
-                Column D added, total row extended{" "}
-                <span style={{ color: "var(--faint)" }}>{t("details.by_me")}</span>
-              </div>
-            </DetailsLine>
-            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-              <Button small>{t("details.undo_mine")}</Button>
-            </div>
-          </DetailsSection>
-          <DetailsSection label={t("details.versions")}>
-            <DetailsLine>
-              <div style={{ flex: 1 }}>Now — growth case added</div>
-            </DetailsLine>
-            <DetailsLine>
-              <div style={{ flex: 1 }}>20 min ago — you edited D8</div>
-              <Button small>{t("details.go_back")}</Button>
-            </DetailsLine>
-          </DetailsSection>
+        <div style={{ padding: "14px 16px" }}>
+          <SteeringPanel
+            notes={steering.state.notes}
+            proposed={steering.state.proposed}
+            problem={steering.state.problem}
+            onAdd={(note) => void steering.add(note)}
+            onAct={(id, action, text) => void steering.act(id, action, text)}
+          />
         </div>
       }
     />

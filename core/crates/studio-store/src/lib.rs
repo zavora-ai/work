@@ -15,8 +15,13 @@ use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension};
 
-pub const MIGRATIONS: &[(&str, &str)] =
-    &[("0001_init", include_str!("../migrations/0001_init.sql"))];
+pub const MIGRATIONS: &[(&str, &str)] = &[
+    ("0001_init", include_str!("../migrations/0001_init.sql")),
+    (
+        "0002_thread_turns",
+        include_str!("../migrations/0002_thread_turns.sql"),
+    ),
+];
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -154,9 +159,14 @@ mod tests {
     #[test]
     fn migration_applies_and_is_idempotent() {
         let mut s = store();
-        assert_eq!(s.applied_migrations().unwrap(), vec!["0001_init"]);
+        let expected = vec!["0001_init", "0002_thread_turns"];
+        assert_eq!(s.applied_migrations().unwrap(), expected);
         s.migrate().expect("re-running migrations is a no-op");
-        assert_eq!(s.applied_migrations().unwrap(), vec!["0001_init"]);
+        assert_eq!(
+            s.applied_migrations().unwrap(),
+            expected,
+            "a migration must not be applied twice"
+        );
     }
 
     #[test]
@@ -174,6 +184,7 @@ mod tests {
             "jobs",
             "spend_ledger",
             "steering_notes",
+            "thread_turns",
             "tray_items",
         ] {
             assert!(

@@ -12,6 +12,9 @@
 //! them, and notices when a file changed underneath — because someone opened it in
 //! Excel, which they are entitled to do.
 
+/// Where the User's work lives on their own disk.
+pub mod home;
+
 use std::path::{Path, PathBuf};
 
 use rusqlite::{OptionalExtension, params};

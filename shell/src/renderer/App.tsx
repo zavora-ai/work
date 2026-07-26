@@ -32,7 +32,14 @@ import {
 import { ALL_ROUTES, type Route } from "./routes.ts";
 import { useDeck, useDocument, type DeckState, type DocumentState } from "./useArtefact.ts";
 
-const REVIEW_MODE = true;
+/**
+ * The route switcher is a review tool, not part of the product.
+ *
+ * It was visible in the built application, which is how a reviewer's convenience becomes a
+ * User's confusion. It now appears only when the interface is being reviewed in a browser,
+ * never in the desktop application, where `window.studio` exists.
+ */
+const REVIEW_MODE = typeof window !== "undefined" && window.studio === undefined;
 
 const WORKSPACE_ROUTES: Route[] = [
   "documentWorkspace",
@@ -133,6 +140,8 @@ export function App() {
   const doc = useDocument(paths.document);
   const deck = useDeck(paths.deck);
   const [activeSlide, setActiveSlide] = useState(0);
+  // Bumped when a file changed, so the work list and folder listings refetch.
+  const [conversationChangedAt, setConversationChangedAt] = useState(0);
 
   /**
    * Open one of the User's own files in the workspace that understands it.
@@ -141,6 +150,22 @@ export function App() {
    * workspace and then a file. An unknown kind is not an error worth a dialog: there is
    * simply nothing here that can open it.
    */
+  /** Open one of the User's own files, by path. */
+  const openPath = (path: string, kind?: string) => {
+    const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
+    const which = kind ?? extension;
+    if (which === "spreadsheet" || extension === "xlsx") {
+      setPaths((current) => ({ ...current, sheet: path }));
+      navigate("spreadsheetWorkspace");
+    } else if (which === "document" || extension === "docx") {
+      setPaths((current) => ({ ...current, document: path }));
+      navigate("documentWorkspace");
+    } else if (which === "deck" || extension === "pptx") {
+      setPaths((current) => ({ ...current, deck: path }));
+      navigate("deckWorkspace");
+    }
+  };
+
   const openFile = async () => {
     const bridge = typeof window === "undefined" ? undefined : window.studio;
     const chosen = await bridge?.openFile?.();
@@ -191,6 +216,13 @@ export function App() {
         collapsed={leftCollapsed}
         onToggle={() => setLeftCollapsed((value) => !value)}
         waitingCount={TRAY.length}
+        // Clicking a piece of work reopens the file it was about, which is what returning
+        // to it means. The list is refetched whenever a file changed.
+        onOpenThread={(thread) => {
+          if (thread.file) openPath(thread.file);
+          else navigate("thread", thread.id);
+        }}
+        threadsChangedAt={conversationChangedAt}
         navigator={navigatorFor(route, doc, deck, activeSlide)}
       />
 
@@ -198,14 +230,14 @@ export function App() {
         route === "documentWorkspace" ? (
           <DocumentWorkspace {...workspaceProps} state={doc} />
         ) : route === "spreadsheetWorkspace" ? (
-          <SpreadsheetWorkspace {...workspaceProps} path={paths.sheet} />
+          <SpreadsheetWorkspace {...workspaceProps} path={paths.sheet} thread={threadFor(paths.sheet)} />
         ) : route === "deckWorkspace" ? (
           <DeckWorkspace {...workspaceProps} state={deck} active={activeSlide} onActive={setActiveSlide} />
         ) : (
           <HonestLimits {...workspaceProps} />
         )
       ) : (
-        <Screen route={route} threadId={threadId} onNavigate={navigate} openFile={openFile} />
+        <Screen route={route} threadId={threadId} onNavigate={navigate} openFile={openFile} openPath={openPath} />
       )}
 
       {REVIEW_MODE ? <Switcher route={route} onSelect={navigate} /> : null}
@@ -231,17 +263,32 @@ function SkipLink() {
   );
 }
 
+/**
+ * Which piece of work a file belongs to.
+ *
+ * One identifier per file, so opening a different spreadsheet is a different piece of work
+ * with its own conversation and its own notes. Everything shared a single identifier before,
+ * which merged every file the User had ever opened into one.
+ */
+function threadFor(path?: string): string | undefined {
+  if (!path) return undefined;
+  return `file:${path}`;
+}
+
 function Screen({
   route,
   threadId,
   onNavigate,
   openFile,
+  openPath,
 }: {
   route: Route;
   threadId?: string;
   onNavigate: (route: Route, threadId?: string) => void;
   /** Ask the User for a file and open it. Absent outside the desktop app. */
   openFile?: () => void;
+  /** Open one of the User's own files, by path. */
+  openPath?: (path: string, kind?: string) => void;
 }) {
   switch (route) {
     case "dashboard":
@@ -264,7 +311,7 @@ function Screen({
     case "documents":
     case "decks":
     case "spreadsheets":
-      return <Repository key={route} onNavigate={onNavigate} route={route} onOpenFile={openFile} />;
+      return <Repository key={route} onNavigate={onNavigate} route={route} onOpenFile={openFile} onOpenPath={openPath} />;
     // Keyed so that arriving from a different route resets which section is open:
     // without it React reuses the component and its tab state persists.
     case "settings":

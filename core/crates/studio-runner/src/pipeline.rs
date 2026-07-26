@@ -147,6 +147,116 @@ impl ServerBinaries {
     }
 }
 
+/// Where the content actually is, in terms the specialist can act on.
+///
+/// Cheap to compute and prevents a whole class of confident mistake: a specialist that
+/// assumes A1 will write against empty cells and produce a column of zeros.
+fn describe_artefact(path: &std::path::Path) -> String {
+    match studio_sheets::read(path, studio_sheets::Window::default()) {
+        Ok(model) => {
+            let mut lines = vec![String::from("What is in it:")];
+            for sheet in &model.sheets {
+                let first_row = sheet.first_row + 1;
+                let last_row = sheet.first_row + sheet.rows.len() as u32;
+                let headers: Vec<String> = sheet
+                    .rows
+                    .first()
+                    .map(|row| row.iter().map(|cell| cell.display.clone()).collect())
+                    .unwrap_or_default();
+                lines.push(format!(
+                    "- sheet \"{}\": rows {first_row} to {last_row}, first column {}. \
+                     The first row of content reads: {}",
+                    sheet.name,
+                    column_name(sheet.first_col as u32),
+                    if headers.is_empty() {
+                        "nothing".to_string()
+                    } else {
+                        headers.join(", ")
+                    }
+                ));
+            }
+            lines.push(String::from(
+                "Write into the rows named above; do not assume the table starts at row 1.",
+            ));
+            lines.join("\n")
+        }
+        // Not being able to describe it is not a reason to refuse the work.
+        Err(_) => String::new(),
+    }
+}
+
+/// A column's letter, as the User would say it.
+fn column_name(index: u32) -> String {
+    let mut name = String::new();
+    let mut n = index;
+    loop {
+        name.insert(0, (b'A' + (n % 26) as u8) as char);
+        if n < 26 {
+            break;
+        }
+        n = n / 26 - 1;
+    }
+    name
+}
+
+/// What the User typed, as the kind of thing they meant.
+///
+/// A spreadsheet is not a text editor: typing 1999 into a cell means the number, and a
+/// number stored as text breaks every formula that refers to it. Sending the text verbatim
+/// did exactly that.
+fn typed_value(text: &str) -> serde_json::Value {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return serde_json::Value::String(String::new());
+    }
+    // A formula stays a string; the engine recognises the leading sign.
+    if trimmed.starts_with('=') {
+        return serde_json::Value::String(trimmed.to_string());
+    }
+    if let Ok(number) = trimmed.replace(',', "").parse::<f64>()
+        && let Some(value) = serde_json::Number::from_f64(number)
+    {
+        return serde_json::Value::Number(value);
+    }
+    if trimmed.eq_ignore_ascii_case("true") {
+        return serde_json::Value::Bool(true);
+    }
+    if trimmed.eq_ignore_ascii_case("false") {
+        return serde_json::Value::Bool(false);
+    }
+    serde_json::Value::String(trimmed.to_string())
+}
+
+/// Pull a handle out of whatever shape a server answered in.
+///
+/// Each server nests its answer differently and the handle is what every later operation
+/// refers to, so it is worth finding wherever it sits.
+fn find_handle(answer: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(answer).ok()?;
+    fn search(value: &serde_json::Value) -> Option<String> {
+        match value {
+            serde_json::Value::Object(map) => {
+                for key in ["workbook_id", "handle"] {
+                    if let Some(found) = map.get(key) {
+                        return match found {
+                            serde_json::Value::String(text) => Some(text.clone()),
+                            other => Some(other.to_string()),
+                        };
+                    }
+                }
+                map.values().find_map(search)
+            }
+            serde_json::Value::Array(items) => items.iter().find_map(search),
+            serde_json::Value::String(text) => {
+                let inner: serde_json::Value = serde_json::from_str(text).ok()?;
+                search(&inner)
+            }
+            _ => None,
+        }
+    }
+    search(&value)
+}
+
 impl Engine {
     pub fn new(policy: Policy, servers: ServerBinaries) -> Self {
         Self { policy, servers }
@@ -158,6 +268,88 @@ impl Engine {
     /// tier rather than the cheapest.
     pub fn model_reference(&self) -> Option<&ModelRef> {
         self.policy.chain_for(QualityTier::Balanced).first()
+    }
+
+    /// A cell the User typed themselves.
+    ///
+    /// No model is involved — the User already knows what they want — but the same gate
+    /// decides and the same server writes, so a change made by hand and a change made for
+    /// them are the same kind of thing on the way to the file.
+    pub async fn edit_cell(
+        &self,
+        path: &str,
+        sheet: &str,
+        cell: &str,
+        value: &str,
+    ) -> Result<(), RunError> {
+        let file = std::path::Path::new(path);
+        let kind = ArtefactKind::of(file).ok_or(RunError::UnknownKind)?;
+        if kind != ArtefactKind::Spreadsheet {
+            return Err(RunError::UnknownKind);
+        }
+        let binary = self
+            .servers
+            .for_kind(kind)
+            .ok_or_else(|| RunError::ServerUnavailable {
+                detail: "no spreadsheet server provisioned".to_string(),
+            })?;
+
+        let server = Arc::new(
+            Server::start(kind.server_spec(binary.to_string_lossy()))
+                .await
+                .map_err(|detail| RunError::ServerUnavailable { detail })?,
+        );
+
+        // The gate decides before anything is written, for the User's own edit as much as
+        // for an agent's.
+        let classifier = kind.classifier();
+        for operation in ["write_cells", "save_workbook"] {
+            let decision = studio_gate::decide(
+                &classifier,
+                kind.server_name(),
+                operation,
+                JobKind::OneOff,
+                JobState::Active,
+                RunMode::Live,
+                false,
+            );
+            if matches!(decision, studio_gate::Decision::Suppress { .. }) {
+                return Err(RunError::Failed {
+                    detail: format!("the gate refused {operation}: {decision:?}"),
+                });
+            }
+        }
+
+        let opened = server
+            .call(
+                "open_workbook",
+                serde_json::json!({ "file_path": path, "read_only": false }),
+            )
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+        let handle = find_handle(&opened).ok_or_else(|| RunError::Failed {
+            detail: format!("no handle in the server's answer: {opened}"),
+        })?;
+
+        server
+            .call(
+                "write_cells",
+                serde_json::json!({
+                    "workbook_id": handle,
+                    "sheet_name": sheet,
+                    "cells": [{ "cell": cell, "value": typed_value(value) }],
+                }),
+            )
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+        server
+            .call(
+                "save_workbook",
+                serde_json::json!({ "workbook_id": handle, "file_path": path }),
+            )
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+        Ok(())
     }
 
     /// Do the work the User asked for.
@@ -253,9 +445,13 @@ impl Engine {
 
         // The file the User is looking at, said plainly, so the specialist does not have to
         // be told twice.
+        // What is actually in the file, so the specialist does not have to guess. It guessed
+        // wrong in a way worth preventing: it assumed the table started at row 1 when it
+        // started at row 5, and wrote a column of formulas against empty cells.
         let opening = format!(
-            "The file open is {}.\n\n{}",
+            "The file open is {}.\n{}\n\n{}",
             request.artefact.display(),
+            describe_artefact(&request.artefact),
             request.asked
         );
 
@@ -369,6 +565,32 @@ mod tests {
         assert!(!outcome.saved);
         assert!(outcome.performed.is_empty());
         assert!(outcome.refused.is_empty());
+    }
+
+    /// A spreadsheet is not a text editor: a typed number must stay a number, or every
+    /// formula that refers to the cell breaks. It was being sent as text.
+    #[test]
+    fn what_the_user_types_keeps_its_kind() {
+        assert!(typed_value("1999").is_number());
+        assert!(
+            typed_value(" 4,960,000 ").is_number(),
+            "thousands separators are still a number"
+        );
+        assert!(typed_value("-2.5").is_number());
+        assert_eq!(typed_value("=C6*0.3"), serde_json::json!("=C6*0.3"));
+        assert_eq!(typed_value("July"), serde_json::json!("July"));
+        assert_eq!(typed_value("true"), serde_json::json!(true));
+        assert_eq!(typed_value(""), serde_json::json!(""));
+        // A thing that only looks numeric is text, because it is.
+        assert!(typed_value("1999 units").is_string());
+    }
+
+    #[test]
+    fn a_column_is_named_as_the_user_would_say_it() {
+        assert_eq!(column_name(0), "A");
+        assert_eq!(column_name(3), "D");
+        assert_eq!(column_name(25), "Z");
+        assert_eq!(column_name(26), "AA");
     }
 
     #[test]

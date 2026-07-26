@@ -8,6 +8,7 @@
 //! loopback API arrives with task 1.5 and the ADK-Rust runner with task 3.5.
 
 mod api;
+mod keeper;
 
 use studio_jobs::{Job, JobKind, JobState};
 use studio_store::Store;
@@ -60,10 +61,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             studio_router::Policy::openai_default(),
             servers,
         ));
-        api::Api::with_engine(&token, engine)
+        let api = api::Api::with_engine(&token, engine);
+        match keeper::Keeper::open(std::path::Path::new(&dir)) {
+            Ok(keeper) => api.with_keeper(keeper),
+            Err(detail) => {
+                // The store is where the User's work is kept, so failing to open it is
+                // worth saying loudly — but it must not stop them reading a file.
+                eprintln!("[core] nothing will be kept this session: {detail}");
+                api
+            }
+        }
     };
     #[cfg(not(feature = "adk"))]
-    let state = api::Api::new(&token);
+    let state = match keeper::Keeper::open(std::path::Path::new(&dir)) {
+        Ok(keeper) => api::Api::new(&token).with_keeper(keeper),
+        Err(detail) => {
+            eprintln!("[core] nothing will be kept this session: {detail}");
+            api::Api::new(&token)
+        }
+    };
     println!("Listening on 127.0.0.1:{port} (token withheld from output)");
 
     if std::env::var("ZWS_SERVE").is_ok() {

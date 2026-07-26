@@ -20,12 +20,20 @@ const ROW_HEADER = 40;
 export function SheetGrid({
   model,
   note,
+  onEdit,
 }: {
   model: GridModel;
   /** A short aside for the sheet strip, where there is room for it. */
   note?: string;
+  /**
+   * Change a cell yourself. Absent where the file cannot be written, in which case the bar
+   * shows the value and does not pretend to accept one.
+   */
+  onEdit?: (sheet: string, cell: string, value: string) => void;
 }) {
   const [active, setActive] = useState(model.active);
+  // What the User has typed but not yet committed. Undefined means "showing the cell".
+  const [typed, setTyped] = useState<string | undefined>(undefined);
   const [selected, setSelected] = useState<{ row: number; col: number }>({
     row: model.sheets[model.active]?.firstRow ?? 0,
     col: (model.sheets[model.active]?.firstCol ?? 0) + 3,
@@ -71,15 +79,42 @@ export function SheetGrid({
         >
           {cellRef(selected.row, selected.col)}
         </span>
-        <Field
-          value={cell?.formula ?? cell?.display ?? ""}
-          mono
-          style={{ flex: 1, padding: "6px 10px", fontSize: 12 }}
-        />
+        {onEdit ? (
+          <Field
+            // Typing here is the User's own edit. It goes the same way an agent's does.
+            value={typed ?? cell?.formula ?? cell?.display ?? ""}
+            mono
+            label={cellRef(selected.row, selected.col)}
+            onChange={(event) => setTyped(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                const value = typed ?? "";
+                setTyped(undefined);
+                onEdit(sheet.name, cellRef(selected.row, selected.col), value);
+              } else if (event.key === "Escape") {
+                setTyped(undefined);
+              }
+            }}
+            style={{ flex: 1, padding: "6px 10px", fontSize: 12 }}
+          />
+        ) : (
+          <Field
+            value={cell?.formula ?? cell?.display ?? ""}
+            mono
+            style={{ flex: 1, padding: "6px 10px", fontSize: 12 }}
+          />
+        )}
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-        <Grid sheet={sheet} selected={selected} onSelect={setSelected} />
+        <Grid
+          sheet={sheet}
+          selected={selected}
+          onSelect={(at) => {
+            setTyped(undefined);
+            setSelected(at);
+          }}
+        />
       </div>
 
       <div

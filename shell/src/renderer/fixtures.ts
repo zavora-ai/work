@@ -325,9 +325,22 @@ export const FILES: FileRow[] = [
   },
 ];
 
+/**
+ * The figures on the Dashboard.
+ *
+ * These were `5`, `3`, `11` and `$0.62` — invented, and indistinguishable on screen from
+ * counts that had been measured. A figure we do not have is reported as unavailable rather
+ * than as zero or as a plausible number, because a wrong figure shown confidently is worse
+ * than an absent one: the User cannot tell which they are looking at.
+ *
+ * They become real when the store is asked for them. Until then the em dash is the honest
+ * answer.
+ */
+export const UNAVAILABLE = "—";
+
 export const METRICS = {
-  working: "5",
-  waiting: "3",
-  done: "11",
-  cost: "$0.62",
+  working: UNAVAILABLE,
+  waiting: UNAVAILABLE,
+  done: UNAVAILABLE,
+  cost: UNAVAILABLE,
 };

@@ -14,7 +14,7 @@
  */
 
 import { t } from "../../shared/strings.ts";
-import { THREADS } from "../fixtures.ts";
+import { useThreads, type Thread } from "../useOwn.ts";
 import type { Route } from "../routes.ts";
 import { Icon, SectionLabel } from "./primitives.tsx";
 import { StatusGlyph } from "./state.tsx";
@@ -33,6 +33,20 @@ const DOC_ENTRIES: { route: Route; label: string; icon: Parameters<typeof Icon>[
  * collapses to a single row so the navigator has room: the panel is contextual, not
  * fixed.
  */
+/** How a piece of work reads when hovered: the file it is about, and when it changed. */
+function describeThread(thread: Thread): string {
+  const name = thread.file?.split("/").pop();
+  return name ? `${name} · ${whenChanged(thread.changed)}` : whenChanged(thread.changed);
+}
+
+function whenChanged(seconds: number): string {
+  const minutes = Math.floor((Date.now() - seconds * 1000) / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)} hours ago`;
+  return new Date(seconds * 1000).toLocaleDateString([], { day: "numeric", month: "short" });
+}
+
 export interface Navigator {
   label: string;
   items: { label: string; on?: boolean; indent?: boolean; badge?: string }[];
@@ -45,6 +59,8 @@ export function LeftPanel({
   onToggle,
   waitingCount,
   navigator,
+  onOpenThread,
+  threadsChangedAt,
 }: {
   route: Route;
   onNavigate: (route: Route, threadId?: string) => void;
@@ -52,7 +68,13 @@ export function LeftPanel({
   onToggle: () => void;
   waitingCount: number;
   navigator?: Navigator;
+  /** Open one of the User's own pieces of work. */
+  onOpenThread?: (thread: Thread) => void;
+  /** Bumped when the work list should be refetched. */
+  threadsChangedAt?: number;
 }) {
+  const { threads } = useThreads(threadsChangedAt);
+
   if (collapsed) {
     return (
       <nav
@@ -78,8 +100,8 @@ export function LeftPanel({
         >
           <Icon name="chevronRight" size={16} />
         </button>
-        {THREADS.slice(0, 4).map((thread) => (
-          <StatusGlyph key={thread.id} badge={thread.badge} detail={thread.statusDetail} />
+        {threads.slice(0, 4).map((thread) => (
+          <StatusGlyph key={thread.id} badge="finished" detail={thread.purpose} />
         ))}
       </nav>
     );
@@ -138,13 +160,25 @@ export function LeftPanel({
 
       <SectionLabel>{t("nav.your_work")}</SectionLabel>
       <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        {THREADS.map((thread) => (
+        {threads.length === 0 ? (
+          <p
+            style={{
+              fontSize: 11.5,
+              color: "var(--muted)",
+              margin: "2px 9px 6px",
+              lineHeight: 1.5,
+            }}
+          >
+            {t("nav.no_work_yet")}
+          </p>
+        ) : null}
+        {threads.map((thread) => (
           <button
             key={thread.id}
             type="button"
-            onClick={() => onNavigate("thread", thread.id)}
-            aria-label={`${thread.purpose}, ${thread.statusDetail}`}
-            title={thread.statusDetail}
+            onClick={() => onOpenThread?.(thread)}
+            aria-label={thread.purpose}
+            title={describeThread(thread)}
             style={{
               display: "flex",
               alignItems: "center",
@@ -160,7 +194,7 @@ export function LeftPanel({
               width: "100%",
             }}
           >
-            <StatusGlyph badge={thread.badge} detail={thread.statusDetail} />
+            <StatusGlyph badge="finished" detail={describeThread(thread)} />
             <span
               style={{
                 overflow: "hidden",

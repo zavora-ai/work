@@ -50,6 +50,22 @@ pub enum EventKind {
     Progress { job_id: String, message: String },
 }
 
+/// The User's folder is not available, which only happens in a build that keeps nothing.
+#[derive(Debug)]
+pub struct HomeUnavailable;
+
+impl std::fmt::Display for HomeUnavailable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Work Studio could not find your folder")
+    }
+}
+
+impl HomeUnavailable {
+    pub fn detail(&self) -> Option<&str> {
+        None
+    }
+}
+
 /// Bounded history so a reconnecting renderer can replay. Older events are
 /// dropped; the renderer refetches state when its resume point is too old.
 const HISTORY: usize = 512;
@@ -62,8 +78,8 @@ pub struct Api {
     /// What does the work. Absent when this build has nothing to think with.
     #[cfg(feature = "adk")]
     engine: Option<Arc<studio_runner::pipeline::Engine>>,
-    /// What the User has told Work Studio, by thread.
-    steering: RwLock<std::collections::BTreeMap<String, Vec<String>>>,
+    /// The durable side: the store and the User's own folder.
+    keeper: Option<Arc<crate::keeper::Keeper>>,
 }
 
 impl Api {
@@ -76,8 +92,62 @@ impl Api {
             tx,
             #[cfg(feature = "adk")]
             engine: None,
-            steering: RwLock::new(std::collections::BTreeMap::new()),
+            keeper: None,
         })
+    }
+
+    /// The same, keeping what happens.
+    pub fn with_keeper(self: Arc<Self>, keeper: Arc<crate::keeper::Keeper>) -> Arc<Self> {
+        Arc::new(Self {
+            token: self.token.clone(),
+            seq: AtomicU64::new(self.seq.load(Ordering::SeqCst)),
+            history: RwLock::new(Vec::new()),
+            tx: self.tx.clone(),
+            #[cfg(feature = "adk")]
+            engine: self.engine.clone(),
+            keeper: Some(keeper),
+        })
+    }
+
+    /// The User's own folder.
+    pub fn home(&self) -> std::result::Result<&studio_artefacts::home::Home, HomeUnavailable> {
+        self.keeper
+            .as_ref()
+            .map(|keeper| keeper.home())
+            .ok_or(HomeUnavailable)
+    }
+
+    pub fn steering_view(
+        &self,
+        thread: Option<&str>,
+    ) -> std::result::Result<crate::keeper::SteeringView, String> {
+        self.keeper
+            .as_ref()
+            .ok_or_else(|| "nothing is being kept".to_string())?
+            .steering_view(thread)
+    }
+
+    pub fn add_note(
+        &self,
+        thread: Option<&str>,
+        text: &str,
+    ) -> std::result::Result<crate::keeper::NoteView, String> {
+        self.keeper
+            .as_ref()
+            .ok_or_else(|| "nothing is being kept".to_string())?
+            .add_note(thread, text)
+    }
+
+    pub fn act_on_note(
+        &self,
+        id: &str,
+        action: &str,
+        text: Option<&str>,
+    ) -> std::result::Result<(), String> {
+        self.keeper
+            .as_ref()
+            .ok_or_else(|| "nothing is being kept".to_string())?
+            .act_on_note(id, action, text)
     }
 
     /// The same, with something to think with.
@@ -93,7 +163,7 @@ impl Api {
             history: RwLock::new(Vec::new()),
             tx,
             engine: Some(engine),
-            steering: RwLock::new(std::collections::BTreeMap::new()),
+            keeper: None,
         })
     }
 
@@ -107,22 +177,10 @@ impl Api {
     /// Resolved here rather than sent by the renderer, so nothing influences a run that the
     /// User cannot see and edit (Requirement 6).
     pub async fn steering_for(&self, thread: &str) -> Vec<String> {
-        self.steering
-            .read()
-            .await
-            .get(thread)
-            .cloned()
-            .unwrap_or_default()
-    }
-
-    /// Record something the User has told Work Studio.
-    pub async fn remember_steering(&self, thread: &str, note: impl Into<String>) {
-        self.steering
-            .write()
-            .await
-            .entry(thread.to_string())
-            .or_default()
-            .push(note.into());
+        match &self.keeper {
+            Some(keeper) => keeper.notes_for_run(thread, Some("spreadsheet")),
+            None => Vec::new(),
+        }
     }
 
     /// Publish an event, assigning it the next sequence number.
@@ -211,6 +269,16 @@ pub fn router(api: Arc<Api>) -> Router {
         .route("/deck", get(deck))
         // Asking for a change. A POST because it changes the User's file.
         .route("/ask", axum::routing::post(ask))
+        // The User's own folder, and what they have told Work Studio.
+        .route("/files", get(files))
+        .route("/folder", axum::routing::post(new_folder))
+        .route("/steering", get(steering).post(add_steering))
+        .route("/steering/act", axum::routing::post(act_on_steering))
+        // The User's own work, and what was said about it.
+        .route("/threads", get(threads))
+        .route("/thread", get(thread))
+        // The User's own edit. Same path as an agent's, which is the point.
+        .route("/edit", axum::routing::post(edit))
         .with_state(api)
 }
 
@@ -257,6 +325,246 @@ pub struct PathQuery {
     pub path: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct WithinQuery {
+    /// A folder inside the User's own folder. Absent means the top of it.
+    pub within: Option<String>,
+}
+
+/// What is really in the User's folder.
+///
+/// Folders are real folders and kinds are filters, so this reports what is on disk and says
+/// what kind each file is; it never invents a folder to group them by (Property 31).
+async fn files(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Query(query): Query<WithinQuery>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let home = match api.home() {
+        Ok(home) => home,
+        Err(error) => return problem(error.to_string(), error.detail()),
+    };
+    match home.list(query.within.as_deref()) {
+        Ok(entries) => Json(serde_json::json!({
+            "location": home.described(),
+            "root": home.root().to_string_lossy(),
+            "entries": entries,
+        }))
+        .into_response(),
+        Err(error) => problem(error.to_string(), error.detail()),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NewFolder {
+    pub name: String,
+    pub within: Option<String>,
+}
+
+async fn new_folder(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<NewFolder>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let home = match api.home() {
+        Ok(home) => home,
+        Err(error) => return problem(error.to_string(), error.detail()),
+    };
+    match home.create_folder(body.within.as_deref(), &body.name) {
+        Ok(entry) => Json(entry).into_response(),
+        Err(error) => problem(error.to_string(), error.detail()),
+    }
+}
+
+/// What the User has told Work Studio: the notes it goes on, and anything it has noticed
+/// and is waiting to be told about.
+async fn steering(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Query(query): Query<ThreadQuery>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match api.steering_view(query.thread.as_deref()) {
+        Ok(view) => Json(view).into_response(),
+        Err(detail) => problem(
+            "Work Studio could not read your notes".into(),
+            Some(&detail),
+        ),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ThreadQuery {
+    pub thread: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NewNote {
+    pub note: String,
+    /// Absent for a note that applies to everything.
+    pub thread: Option<String>,
+}
+
+async fn add_steering(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<NewNote>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match api.add_note(body.thread.as_deref(), &body.note) {
+        Ok(note) => Json(note).into_response(),
+        Err(detail) => problem("Work Studio could not keep that note".into(), Some(&detail)),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NoteAction {
+    pub id: String,
+    /// One of: accept, reword, stop, forget.
+    pub action: String,
+    pub text: Option<String>,
+}
+
+/// Accepting, rewording, stopping or forgetting a note.
+///
+/// Accepting is the step that matters: nothing Work Studio worked out for itself influences
+/// any run until the User has agreed to it in words they can read (Property 33).
+async fn act_on_steering(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<NoteAction>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match api.act_on_note(&body.id, &body.action, body.text.as_deref()) {
+        Ok(()) => Json(serde_json::json!({ "done": true })).into_response(),
+        Err(detail) => problem(
+            "Work Studio could not change that note".into(),
+            Some(&detail),
+        ),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CellEdit {
+    pub path: String,
+    pub sheet: String,
+    /// The cell in the User's own terms, e.g. "D6".
+    pub cell: String,
+    pub value: String,
+    pub thread: Option<String>,
+}
+
+/// A change the User made by hand.
+///
+/// It goes through the same dispatcher an agent's change does, with the author set to the
+/// User, so one history holds both and neither is a special case (Correctness Property 23).
+#[cfg(feature = "adk")]
+async fn edit(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<CellEdit>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(engine) = api.engine() else {
+        return problem("Work Studio cannot change that file yet".into(), None);
+    };
+    match engine
+        .edit_cell(&body.path, &body.sheet, &body.cell, &body.value)
+        .await
+    {
+        Ok(()) => {
+            if let Some(keeper) = api.keeper.as_ref() {
+                keeper.log(
+                    "artefact",
+                    &format!("you changed {} on {}", body.cell, body.sheet),
+                );
+                if let Some(thread) = body.thread.as_deref() {
+                    let _ = keeper.ensure_thread(thread, "Editing by hand", Some(&body.path));
+                }
+            }
+            Json(serde_json::json!({ "done": true })).into_response()
+        }
+        Err(error) => problem(error.to_string(), error.detail()),
+    }
+}
+
+#[cfg(not(feature = "adk"))]
+async fn edit(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(_body): Json<CellEdit>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    problem("Work Studio cannot change that file yet".into(), None)
+}
+
+/// The pieces of work the User has done. This is "Your work" in the interface.
+async fn threads(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match api.keeper.as_ref().map(|k| k.threads()) {
+        Some(Ok(threads)) => Json(serde_json::json!({ "threads": threads })).into_response(),
+        Some(Err(detail)) => problem("Work Studio could not read your work".into(), Some(&detail)),
+        None => Json(serde_json::json!({ "threads": [] })).into_response(),
+    }
+}
+
+/// One piece of work: what was said, and what Work Studio goes on.
+async fn thread(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Query(query): Query<ThreadQuery>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(id) = query.thread else {
+        return problem("Work Studio needs to know which piece of work".into(), None);
+    };
+    let Some(keeper) = api.keeper.as_ref() else {
+        return Json(serde_json::json!({ "turns": [] })).into_response();
+    };
+    match (keeper.turns(&id), keeper.steering_view(Some(&id))) {
+        (Ok(turns), Ok(steering)) => Json(serde_json::json!({
+            "turns": turns,
+            "steering": steering,
+        }))
+        .into_response(),
+        (Err(detail), _) | (_, Err(detail)) => {
+            problem("Work Studio could not read that work".into(), Some(&detail))
+        }
+    }
+}
+
+/// A problem in the User's words, with the cause kept for support only.
+fn problem(message: String, detail: Option<&str>) -> axum::response::Response {
+    if let Some(detail) = detail {
+        tracing_detail(detail);
+    }
+    (
+        StatusCode::UNPROCESSABLE_ENTITY,
+        Json(serde_json::json!({ "problem": message })),
+    )
+        .into_response()
+}
+
 /// What the User typed, and about which file.
 #[derive(Debug, Deserialize)]
 pub struct Asked {
@@ -298,6 +606,13 @@ async fn ask(
         }
     };
 
+    // The piece of work exists before anything is said about it, so a note has something
+    // to belong to and the User can find it again.
+    if let Some(keeper) = api.keeper.as_ref() {
+        let _ = keeper.ensure_thread(&thread, &asked.asked, Some(&asked.path));
+        let _ = keeper.remember_turn(&thread, "you", &asked.asked);
+    }
+
     let request = studio_runner::pipeline::Request {
         asked: asked.asked,
         artefact: std::path::PathBuf::from(&asked.path),
@@ -331,6 +646,21 @@ async fn ask(
         .await;
     drop(tx);
     let _ = publisher.await;
+
+    if let (Some(keeper), Ok(outcome)) = (api.keeper.as_ref(), outcome.as_ref()) {
+        if !outcome.said.is_empty() {
+            let _ = keeper.remember_turn(&thread, "studio", &outcome.said);
+        }
+        keeper.log(
+            "artefact",
+            &format!(
+                "asked about {}: {} operations, {} refused",
+                asked.path,
+                outcome.performed.len(),
+                outcome.refused.len()
+            ),
+        );
+    }
 
     match outcome {
         Ok(outcome) => Json(serde_json::json!({

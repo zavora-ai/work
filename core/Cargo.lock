@@ -2921,6 +2921,7 @@ name = "studio-artefacts"
 version = "0.1.0"
 dependencies = [
  "rusqlite",
+ "serde",
  "studio-store",
  "thiserror 2.0.19",
 ]
@@ -2930,15 +2931,18 @@ name = "studio-core"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "rusqlite",
  "serde",
  "serde_json",
  "studio-api",
+ "studio-artefacts",
  "studio-decks",
  "studio-docs",
  "studio-jobs",
  "studio-router",
  "studio-runner",
  "studio-sheets",
+ "studio-steering",
  "studio-store",
  "studio-strings",
  "thiserror 2.0.19",

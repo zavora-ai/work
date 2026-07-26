@@ -38,6 +38,7 @@ adk-runner = { path = "../../../../adk-rust/adk-runner", optional = true }
 adk-session = { path = "../../../../adk-rust/adk-session", optional = true }
 futures = { version = "0.3", optional = true }
 studio-router.workspace = true
+studio-sheets.workspace = true
 adk-tool = { path = "../../../../adk-rust/adk-tool", features = ["mcp"], optional = true }
 tokio = { workspace = true, optional = true }
 async-trait = { version = "0.1", optional = true }

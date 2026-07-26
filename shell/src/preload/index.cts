@@ -19,6 +19,17 @@ contextBridge.exposeInMainWorld("studio", {
   health: () => ipcRenderer.invoke("core:health"),
   events: (since: number) => ipcRenderer.invoke("core:events", since),
   openFile: () => ipcRenderer.invoke("shell:openFile"),
+  edit: (body: { path: string; sheet: string; cell: string; value: string; thread?: string }) =>
+    ipcRenderer.invoke("core:edit", body),
+  files: (within?: string) => ipcRenderer.invoke("core:files", within),
+  newFolder: (body: { name: string; within?: string }) =>
+    ipcRenderer.invoke("core:newFolder", body),
+  threads: () => ipcRenderer.invoke("core:threads"),
+  thread: (id: string) => ipcRenderer.invoke("core:thread", id),
+  steering: (id?: string) => ipcRenderer.invoke("core:steering", id),
+  addNote: (body: { note: string; thread?: string }) => ipcRenderer.invoke("core:addNote", body),
+  noteAction: (body: { id: string; action: string; text?: string }) =>
+    ipcRenderer.invoke("core:noteAction", body),
   ask: (request: { asked: string; path: string; thread?: string }) =>
     ipcRenderer.invoke("core:ask", request),
   sheet: (path: string) => ipcRenderer.invoke("core:sheet", path),
