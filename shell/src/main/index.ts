@@ -168,6 +168,7 @@ app.whenReady().then(async () => {
   );
 
   ipcMain.handle("core:edit", (_event, body: unknown) => corePost("/edit", body));
+  ipcMain.handle("core:sheetAct", (_event, body: unknown) => corePost("/sheet/act", body));
   ipcMain.handle("core:undo", (_event, body: unknown) => corePost("/undo", body));
   ipcMain.handle("core:format", (_event, body: unknown) => corePost("/format", body));
 

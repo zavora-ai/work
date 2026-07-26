@@ -111,6 +111,115 @@ pub fn progress_for(operation: &str) -> Option<&'static str> {
     })
 }
 
+/// The structural things the User can do to a spreadsheet by hand.
+///
+/// A closed set, on purpose. Every one of these is a real operation on the other side of the
+/// connection, and nothing else can be reached this way — so widening what the interface can do
+/// to the User's file means adding a variant here, which shows up in a diff.
+#[derive(Debug, Clone)]
+pub enum SheetAction {
+    /// Make room. `at` is a row number as the row header shows it, counting from one.
+    InsertRows { at: u32, count: u32 },
+    /// Take rows away, from `at` downwards.
+    DeleteRows { at: u32, count: u32 },
+    /// Make room, at a column letter.
+    InsertColumns { at: String, count: u16 },
+    /// Take columns away, from `at` rightwards.
+    DeleteColumns { at: String, count: u16 },
+    /// Sort a range by one of its columns. `by` is a column letter within the range.
+    Sort {
+        range: String,
+        by: String,
+        ascending: bool,
+        has_header: bool,
+    },
+    /// Hold the rows above and columns left of this cell in place while the rest scrolls.
+    Freeze { at: String },
+    /// Let the columns go back to scrolling.
+    Unfreeze,
+    /// Make one cell of several.
+    Merge { range: String },
+    /// Widen the columns to fit what is in them.
+    FitColumns,
+}
+
+impl SheetAction {
+    /// The operation this asks for, in the capability server's own words.
+    pub fn operation(&self) -> &'static str {
+        match self {
+            Self::InsertRows { .. } | Self::DeleteRows { .. } => "modify_rows",
+            Self::InsertColumns { .. } | Self::DeleteColumns { .. } => "modify_columns",
+            Self::Sort { .. } => "sort_range",
+            Self::Freeze { .. } | Self::Unfreeze => "freeze_panes",
+            Self::Merge { .. } => "merge_cells",
+            Self::FitColumns => "autofit_columns",
+        }
+    }
+
+    /// What to send with it. The sheet is added here so no caller can forget it.
+    fn arguments(&self, sheet: &str) -> serde_json::Value {
+        match self {
+            Self::InsertRows { at, count } => serde_json::json!({
+                "sheet_name": sheet,
+                "action": "insert",
+                // One-based on the wire, because the User is reading a row header.
+                "at_row": at,
+                "count": count,
+            }),
+            Self::DeleteRows { at, count } => serde_json::json!({
+                "sheet_name": sheet, "action": "delete", "at_row": at, "count": count,
+            }),
+            Self::InsertColumns { at, count } => serde_json::json!({
+                "sheet_name": sheet, "action": "insert", "at_column": at, "count": count,
+            }),
+            Self::DeleteColumns { at, count } => serde_json::json!({
+                "sheet_name": sheet, "action": "delete", "at_column": at, "count": count,
+            }),
+            Self::Sort {
+                range,
+                by,
+                ascending,
+                has_header,
+            } => serde_json::json!({
+                "sheet_name": sheet,
+                "range": range,
+                // "direction", not "ascending". The key accepts unknown fields silently, so an
+                // "ascending" field was taken, ignored, and the sort reported success having
+                // sorted the other way — the shape of a control that appears not to work.
+                "sort_keys": [{
+                    "column": by,
+                    "direction": if *ascending { "ascending" } else { "descending" },
+                }],
+                "has_header": has_header,
+            }),
+            Self::Freeze { at } => serde_json::json!({ "sheet_name": sheet, "cell": at }),
+            // Freezing at the top-left corner is how a spreadsheet says "nothing is frozen".
+            Self::Unfreeze => serde_json::json!({ "sheet_name": sheet, "cell": "A1" }),
+            Self::Merge { range } => serde_json::json!({ "sheet_name": sheet, "range": range }),
+            Self::FitColumns => serde_json::json!({ "sheet_name": sheet }),
+        }
+    }
+
+    /// What happened, in the User's words, for the history.
+    pub fn in_words(&self) -> String {
+        match self {
+            Self::InsertRows { at, count } => format!("you inserted {count} row(s) at row {at}"),
+            Self::DeleteRows { at, count } => format!("you deleted {count} row(s) from row {at}"),
+            Self::InsertColumns { at, count } => {
+                format!("you inserted {count} column(s) at column {at}")
+            }
+            Self::DeleteColumns { at, count } => {
+                format!("you deleted {count} column(s) from column {at}")
+            }
+            Self::Sort { range, by, .. } => format!("you sorted {range} by column {by}"),
+            Self::Freeze { at } => format!("you froze the headings at {at}"),
+            Self::Unfreeze => "you unfroze the headings".to_string(),
+            Self::Merge { range } => format!("you merged {range}"),
+            Self::FitColumns => "you fitted the columns".to_string(),
+        }
+    }
+}
+
 /// What a run cost, as the provider counted it.
 ///
 /// Recorded rather than estimated: the figure on the Dashboard is real money, and a plausible
@@ -585,6 +694,82 @@ impl Engine {
 
         server
             .call("set_cell_format", serde_json::Value::Object(arguments))
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+
+        server
+            .call(
+                "save_workbook",
+                serde_json::json!({ "workbook_id": handle, "file_path": path }),
+            )
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+        Ok(())
+    }
+
+    /// A structural change to a spreadsheet, by hand.
+    ///
+    /// Inserting a row, sorting a range, freezing the headings: the things a person does to a
+    /// spreadsheet that are not typing in a cell. Named actions rather than a way to send any
+    /// operation through, because a passthrough would put the whole capability surface behind one
+    /// door and the gate's classification would be the only thing between the User and 93
+    /// operations they never asked for.
+    ///
+    /// Each still goes through the gate and is saved the same way, so there remains one path
+    /// into the file.
+    pub async fn act_on_sheet(
+        &self,
+        path: &str,
+        sheet: &str,
+        action: SheetAction,
+    ) -> Result<(), RunError> {
+        let file = std::path::Path::new(path);
+        let kind = ArtefactKind::of(file).ok_or(RunError::UnknownKind)?;
+        if kind != ArtefactKind::Spreadsheet {
+            return Err(RunError::UnknownKind);
+        }
+        let binary = self.command_for(kind)?;
+        let server = Server::start(kind.server_spec(binary.to_string_lossy()))
+            .await
+            .map_err(|detail| RunError::ServerUnavailable { detail })?;
+
+        let operation = action.operation();
+        let classifier = kind.classifier();
+        for gated in [operation, "save_workbook"] {
+            let decision = studio_gate::decide(
+                &classifier,
+                kind.server_name(),
+                gated,
+                JobKind::OneOff,
+                JobState::Active,
+                RunMode::Live,
+                false,
+            );
+            if matches!(decision, studio_gate::Decision::Suppress { .. }) {
+                return Err(RunError::NotAllowed {
+                    detail: format!("the gate refused {gated}"),
+                });
+            }
+        }
+
+        let opened = server
+            .call(
+                "open_workbook",
+                serde_json::json!({ "file_path": path, "read_only": false }),
+            )
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+        let handle = find_handle(&opened).ok_or_else(|| RunError::Failed {
+            detail: format!("no handle in the answer to open_workbook: {opened}"),
+        })?;
+
+        let mut arguments = action.arguments(sheet);
+        if let Some(object) = arguments.as_object_mut() {
+            object.insert("workbook_id".to_string(), serde_json::json!(handle));
+        }
+
+        server
+            .call(operation, arguments)
             .await
             .map_err(|detail| RunError::Failed { detail })?;
 

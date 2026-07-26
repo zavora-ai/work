@@ -243,7 +243,25 @@ export function SpreadsheetWorkspace(
   const conversation = useAsk(props.path, props.thread ?? "spreadsheet", props.askOnOpen);
   // What the grid says is selected. Formatting belongs to a selection, so the toolbar cannot
   // act until it knows one.
-  const [selection, setSelection] = useState<{ sheet: string; range: string } | undefined>();
+  const [selection, setSelection] = useState<
+    { sheet: string; range: string; row: number; column: string } | undefined
+  >();
+
+  /** Insert, delete, sort, freeze, merge, fit — acting on whatever is selected. */
+  const doToSheet = async (what: string, extra: Record<string, unknown> = {}) => {
+    if (!props.path || !selection) return;
+    await window.studio?.sheetAct?.({
+      path: props.path,
+      sheet: selection.sheet,
+      what,
+      atRow: selection.row,
+      at: selection.column,
+      range: selection.range,
+      thread: props.thread ?? "spreadsheet",
+      ...extra,
+    });
+    setEditedAt(Date.now());
+  };
 
   const undoLast = async () => {
     if (!props.path) return;
@@ -302,7 +320,7 @@ export function SpreadsheetWorkspace(
             }
           : undefined
       }
-      onSelection={(sheet, range) => setSelection({ sheet, range })}
+      onSelection={setSelection}
       onUndo={props.path ? () => void undoLast() : undefined}
       onEditMany={
         props.path
@@ -339,6 +357,77 @@ export function SpreadsheetWorkspace(
               absent control is better than one that lies. */}
           <Button small title="Undo the last change" onClick={() => void undoLast()}>
             Undo
+          </Button>
+          {/* The things a person does to a spreadsheet that are not typing in it. Each acts on
+              what is selected and goes through the same gate and history as any other change. */}
+          <Button
+            small
+            title="Insert a row above this one"
+            onClick={() => void doToSheet("insert rows", { count: 1 })}
+          >
+            +Row
+          </Button>
+          <Button
+            small
+            title="Delete this row"
+            onClick={() => void doToSheet("delete rows", { count: 1 })}
+          >
+            −Row
+          </Button>
+          <Button
+            small
+            title="Insert a column before this one"
+            onClick={() => void doToSheet("insert columns", { count: 1 })}
+          >
+            +Col
+          </Button>
+          <Button
+            small
+            title="Delete this column"
+            onClick={() => void doToSheet("delete columns", { count: 1 })}
+          >
+            −Col
+          </Button>
+          <Button
+            small
+            title="Sort the selection by its first column, smallest first"
+            onClick={() => void doToSheet("sort", { by: selection?.column, hasHeader: false })}
+          >
+            A→Z
+          </Button>
+          <Button
+            small
+            title="Sort the selection by its first column, largest first"
+            onClick={() =>
+              void doToSheet("sort", {
+                by: selection?.column,
+                descending: true,
+                hasHeader: false,
+              })
+            }
+          >
+            Z→A
+          </Button>
+          <Button
+            small
+            title="Keep the rows above and columns left of here in place while the rest scrolls"
+            onClick={() => void doToSheet("freeze")}
+          >
+            Freeze
+          </Button>
+          <Button
+            small
+            title="Make one cell of the selection"
+            onClick={() => void doToSheet("merge")}
+          >
+            Merge
+          </Button>
+          <Button
+            small
+            title="Widen the columns to fit what is in them"
+            onClick={() => void doToSheet("fit columns")}
+          >
+            Fit
           </Button>
           <Button small title="Bold" onClick={() => void applyFormat({ bold: true })}>
             B

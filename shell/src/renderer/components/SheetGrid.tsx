@@ -76,7 +76,15 @@ export function SheetGrid({
    * Reported rather than kept private, because formatting belongs to the selection and the
    * controls for it live above the file, not inside the grid.
    */
-  onSelection?: (sheet: string, range: string) => void;
+  onSelection?: (at: {
+    sheet: string;
+    /** "B6" or "B6:D9". */
+    range: string;
+    /** The row the selection starts at, counting from 1 as the header shows it. */
+    row: number;
+    /** The column letter the selection starts at. */
+    column: string;
+  }) => void;
   /** Put the last change back. Absent where the file cannot be written. */
   onUndo?: () => void;
 }) {
@@ -350,8 +358,18 @@ export function SheetGrid({
 
   // Told outward whenever it changes, so the toolbar is never acting on a stale selection.
   useEffect(() => {
-    if (sheet && reference) onSelection?.(sheet.name, reference);
-  }, [onSelection, reference, sheet]);
+    if (!sheet || !reference) return;
+    const box = range
+      ? normalise(range)
+      : { fromRow: selected.row, fromCol: selected.col, toRow: selected.row, toCol: selected.col };
+    onSelection?.({
+      sheet: sheet.name,
+      range: reference,
+      // One-based, because everything outside the grid speaks in what the User sees.
+      row: box.fromRow + 1,
+      column: columnName(box.fromCol),
+    });
+  }, [onSelection, range, reference, selected, sheet]);
 
   if (!sheet) return null;
 

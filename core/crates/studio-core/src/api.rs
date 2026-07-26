@@ -282,6 +282,7 @@ pub fn router(api: Arc<Api>) -> Router {
         .route("/edit", axum::routing::post(edit))
         .route("/format", axum::routing::post(format_cells))
         .route("/undo", axum::routing::post(undo))
+        .route("/sheet/act", axum::routing::post(act_on_sheet))
         // What each specialist may reach, and which of those are on.
         .route("/capabilities", get(capabilities).post(add_capability))
         .route("/capabilities/act", axum::routing::post(act_on_capability))
@@ -565,6 +566,120 @@ pub struct HandEdit {
 pub struct MoreCells {
     pub cell: String,
     pub value: String,
+}
+
+/// What the User wants done to the sheet itself.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SheetActionRequest {
+    pub path: String,
+    pub sheet: String,
+    /// One of: insert rows, delete rows, insert columns, delete columns, sort, freeze, unfreeze,
+    /// merge, fit columns.
+    pub what: String,
+    /// A row number, for the row actions.
+    #[serde(default)]
+    pub at_row: Option<u32>,
+    /// A column letter, for the column actions, or the cell to freeze at.
+    #[serde(default)]
+    pub at: Option<String>,
+    #[serde(default)]
+    pub count: Option<u32>,
+    /// A range, for sorting and merging.
+    #[serde(default)]
+    pub range: Option<String>,
+    /// The column to sort by, and which way.
+    #[serde(default)]
+    pub by: Option<String>,
+    #[serde(default)]
+    pub descending: bool,
+    #[serde(default)]
+    pub has_header: bool,
+    pub thread: Option<String>,
+}
+
+/// Insert, delete, sort, freeze, merge, fit. The same gate and the same history as any change.
+#[cfg(feature = "adk")]
+async fn act_on_sheet(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<SheetActionRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(engine) = api.engine() else {
+        return problem("Work Studio cannot change that file yet".into(), None);
+    };
+
+    use studio_runner::pipeline::SheetAction;
+    let count = body.count.unwrap_or(1);
+    let action = match body.what.as_str() {
+        "insert rows" => SheetAction::InsertRows {
+            at: body.at_row.unwrap_or(1),
+            count,
+        },
+        "delete rows" => SheetAction::DeleteRows {
+            at: body.at_row.unwrap_or(1),
+            count,
+        },
+        "insert columns" => SheetAction::InsertColumns {
+            at: body.at.clone().unwrap_or_else(|| "A".to_string()),
+            count: count as u16,
+        },
+        "delete columns" => SheetAction::DeleteColumns {
+            at: body.at.clone().unwrap_or_else(|| "A".to_string()),
+            count: count as u16,
+        },
+        "sort" => SheetAction::Sort {
+            range: body.range.clone().unwrap_or_default(),
+            by: body.by.clone().unwrap_or_else(|| "A".to_string()),
+            ascending: !body.descending,
+            has_header: body.has_header,
+        },
+        "freeze" => SheetAction::Freeze {
+            at: body.at.clone().unwrap_or_else(|| "A2".to_string()),
+        },
+        "unfreeze" => SheetAction::Unfreeze,
+        "merge" => SheetAction::Merge {
+            range: body.range.clone().unwrap_or_default(),
+        },
+        "fit columns" => SheetAction::FitColumns,
+        // An action nobody offers is refused rather than approximated.
+        other => {
+            return problem(
+                "Work Studio does not know how to do that to a sheet".into(),
+                Some(other),
+            );
+        }
+    };
+
+    let said = action.in_words();
+    match engine.act_on_sheet(&body.path, &body.sheet, action).await {
+        Ok(()) => {
+            if let Some(keeper) = api.keeper.as_ref() {
+                keeper.record_change(&body.path, &said, true);
+                keeper.log("action", &said);
+                if let Some(thread) = body.thread.as_deref() {
+                    let _ = keeper.ensure_thread(thread, "Editing by hand", Some(&body.path));
+                }
+            }
+            Json(serde_json::json!({ "done": true, "did": said })).into_response()
+        }
+        Err(error) => problem(error.to_string(), error.detail()),
+    }
+}
+
+#[cfg(not(feature = "adk"))]
+async fn act_on_sheet(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(_body): Json<SheetActionRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    problem("Work Studio cannot change that file yet".into(), None)
 }
 
 /// The values a set of cells holds now, for putting back later.

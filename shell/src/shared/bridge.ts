@@ -78,6 +78,12 @@ export interface StudioBridge {
    *
    * Goes the same way an agent's change does, so one history holds both.
    */
+  /**
+   * Do something to the sheet itself: insert or delete rows and columns, sort, freeze, merge,
+   * fit the columns. A closed set of named actions, not a way to send any operation through.
+   */
+  sheetAct(body: Record<string, unknown>): Promise<unknown>;
+
   /** Put the last change to this file back. */
   undo(body: { path: string; thread?: string }): Promise<unknown>;
 
