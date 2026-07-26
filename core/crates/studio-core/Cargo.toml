@@ -6,6 +6,12 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+default = []
+# Lets the Core actually do the work. Needs the ADK-Rust checkout beside this one, so it
+# is off by default and `make ci` does not require it.
+adk = ["dep:studio-runner", "studio-runner/adk", "dep:studio-router"]
+
 [dependencies]
 axum.workspace = true
 serde.workspace = true
@@ -14,8 +20,13 @@ studio-api.workspace = true
 studio-decks.workspace = true
 studio-docs.workspace = true
 studio-jobs.workspace = true
+studio-runner = { workspace = true, optional = true }
+studio-router = { workspace = true, optional = true }
 studio-sheets.workspace = true
 studio-store.workspace = true
 studio-strings.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }

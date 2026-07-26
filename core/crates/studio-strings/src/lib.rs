@@ -117,6 +117,7 @@ pub const CATALOGUE: &[Entry] = &[
     p("steer.new_placeholder", "Tell it something new…"),
     // ---- documents ----
     p("new.open_a_file", "Open a file"),
+    p("kickoff.not_done", "What I left alone"),
     p("doc.blocks", "paragraphs"),
     p("doc.in_this_document", "In this document"),
     p("doc.no_headings", "No headings yet"),

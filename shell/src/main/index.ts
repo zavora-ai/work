@@ -37,6 +37,24 @@ async function coreFetch(path: string): Promise<unknown> {
   return response.json();
 }
 
+/// Asking the Core to do something.
+///
+/// Kept apart from `coreFetch` because a problem here is not a fault to be thrown: the
+/// Core answers a refusal in the User's own words, and the interface should show those
+/// words rather than a status code.
+async function corePost(path: string, body: unknown): Promise<unknown> {
+  if (!core) throw new Error("the Core is not running");
+  const response = await fetch(`http://127.0.0.1:${core.port}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${core.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  return response.json();
+}
+
 function applyContentSecurityPolicy(): void {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
@@ -130,6 +148,13 @@ app.whenReady().then(async () => {
     });
     if (result.canceled || result.filePaths.length === 0) return undefined;
     return result.filePaths[0];
+  });
+
+  ipcMain.handle("core:ask", (_event, request: unknown) => {
+    if (typeof request !== "object" || request === null) {
+      throw new Error("a request is needed");
+    }
+    return corePost("/ask", request);
   });
 
   ipcMain.handle("core:sheet", (_event, path: unknown) => {

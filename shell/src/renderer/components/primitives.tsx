@@ -6,7 +6,7 @@
  * (Requirement 21.4).
  */
 
-import type { CSSProperties, ReactNode } from "react";
+import type { ChangeEvent, CSSProperties, KeyboardEvent, ReactNode } from "react";
 
 import { t, type StringKey } from "../../shared/strings.ts";
 
@@ -211,25 +211,51 @@ export function Field({
   value,
   mono = false,
   style,
+  onChange,
+  onKeyDown,
+  disabled,
+  label,
 }: {
   placeholder?: string;
   value?: string;
   mono?: boolean;
   style?: CSSProperties;
+  onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+  /** An accessible name, for a field with no visible label of its own. */
+  label?: string;
 }) {
+  const frame: CSSProperties = {
+    border: "1px solid var(--border-strong)",
+    borderRadius: 8,
+    padding: "9px 11px",
+    fontSize: 13,
+    background: "#fdfdfc",
+    fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, monospace" : "inherit",
+    ...style,
+  };
+
+  // A field the User can type into is a real input, so the keyboard, screen readers and
+  // the browser's own text handling all work. One that only shows a value stays a plain
+  // box, which is what the formula bar and the read-only screens want.
+  if (onChange) {
+    return (
+      <input
+        type="text"
+        value={value ?? ""}
+        placeholder={placeholder}
+        aria-label={label ?? placeholder}
+        disabled={disabled}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        style={{ ...frame, color: "#3d3933", width: "100%", boxSizing: "border-box" }}
+      />
+    );
+  }
+
   return (
-    <div
-      style={{
-        border: "1px solid var(--border-strong)",
-        borderRadius: 8,
-        padding: "9px 11px",
-        fontSize: 13,
-        color: value ? "#3d3933" : "var(--faint)",
-        background: "#fdfdfc",
-        fontFamily: mono ? "ui-monospace, SFMono-Regular, Menlo, monospace" : "inherit",
-        ...style,
-      }}
-    >
+    <div style={{ ...frame, color: value ? "#3d3933" : "var(--faint)" }}>
       {value ?? placeholder}
     </div>
   );

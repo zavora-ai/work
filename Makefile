@@ -25,6 +25,8 @@ lint: ## Run the vocabulary guardrail (Requirement 1.2)
 adk-check: ## Verify the ADK-Rust adapter and all three specialists (needs sibling checkouts)
 	cd $(CORE) && cargo clippy -p studio-runner --features adk --all-targets -- -D warnings
 	cd $(CORE) && cargo test -p studio-runner --features adk
+	cd $(CORE) && cargo clippy -p studio-core --features adk --all-targets -- -D warnings
+	cd $(CORE) && cargo test -p studio-core --features adk
 
 sheet-server: ## Build the spreadsheet capability server the integration test needs
 	cd ../mcp-servers/worksheet-mcp && cargo build --bin excel-mcp-server

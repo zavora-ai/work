@@ -39,7 +39,7 @@ function isProblem(value: unknown): value is { problem: string } {
   );
 }
 
-export function useSheet(path: string | undefined): SheetState {
+export function useSheet(path: string | undefined, changedAt?: number): SheetState {
   const [state, setState] = useState<SheetState>({
     loading: Boolean(path),
     source: "sample",
@@ -93,7 +93,9 @@ export function useSheet(path: string | undefined): SheetState {
     return () => {
       cancelled = true;
     };
-  }, [path]);
+    // Reloaded when the file changed, so the grid shows what is now in it rather than
+    // what was there when it was opened.
+  }, [path, changedAt]);
 
   return state;
 }

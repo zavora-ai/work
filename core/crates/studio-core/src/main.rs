@@ -47,6 +47,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let token = std::env::var("ZWS_TOKEN").unwrap_or_else(|_| api::mint_token());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let port = listener.local_addr()?.port();
+    // What does the work, when this build has it.
+    //
+    // The servers are looked for beside the sibling checkouts during development; a release
+    // provisions them next to the app. If they are absent the Core still runs and says so
+    // when asked, rather than failing to start.
+    #[cfg(feature = "adk")]
+    let state = {
+        let siblings = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../..");
+        let servers = studio_runner::pipeline::ServerBinaries::from_siblings(&siblings);
+        let engine = std::sync::Arc::new(studio_runner::pipeline::Engine::new(
+            studio_router::Policy::openai_default(),
+            servers,
+        ));
+        api::Api::with_engine(&token, engine)
+    };
+    #[cfg(not(feature = "adk"))]
     let state = api::Api::new(&token);
     println!("Listening on 127.0.0.1:{port} (token withheld from output)");
 

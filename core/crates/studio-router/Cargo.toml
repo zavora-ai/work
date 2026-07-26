@@ -6,7 +6,15 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+default = []
+# Builds a model that can actually answer. Needs the adk-rust workspace beside this
+# one, so it is off by default and the routing rules stay testable without it.
+adk = ["dep:adk-core", "dep:adk-model"]
+
 [dependencies]
+adk-core = { path = "../../../../adk-rust/adk-core", optional = true }
+adk-model = { path = "../../../../adk-rust/adk-model", optional = true, default-features = false, features = ["openai", "anthropic"] }
 rusqlite.workspace = true
 studio-store.workspace = true
 thiserror.workspace = true

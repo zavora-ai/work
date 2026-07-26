@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld("studio", {
   health: () => ipcRenderer.invoke("core:health"),
   events: (since: number) => ipcRenderer.invoke("core:events", since),
   openFile: () => ipcRenderer.invoke("shell:openFile"),
+  ask: (request: { asked: string; path: string; thread?: string }) =>
+    ipcRenderer.invoke("core:ask", request),
   sheet: (path: string) => ipcRenderer.invoke("core:sheet", path),
   document: (path: string) => ipcRenderer.invoke("core:document", path),
   deck: (path: string) => ipcRenderer.invoke("core:deck", path),

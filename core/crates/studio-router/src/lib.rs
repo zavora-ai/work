@@ -12,6 +12,10 @@
 //! micros and only ever shown as currency (Requirement 15.6), rounded so a
 //! fraction of a cent never reaches a primary surface (Requirement 15.7).
 
+/// Building a model that can actually answer. Needs the sibling ADK-Rust checkout.
+#[cfg(feature = "adk")]
+pub mod model;
+
 use std::collections::BTreeMap;
 
 use rusqlite::params;

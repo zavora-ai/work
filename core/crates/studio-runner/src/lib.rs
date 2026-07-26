@@ -13,6 +13,10 @@ pub mod edits;
 pub mod lease;
 
 /// Talking to a capability server. Needs the Capability_Layer beside us.
+/// Doing the work: model, specialist, gate, file.
+#[cfg(feature = "adk")]
+pub mod pipeline;
+
 #[cfg(feature = "adk")]
 pub mod mcp;
 

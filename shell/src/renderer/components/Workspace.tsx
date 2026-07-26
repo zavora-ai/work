@@ -265,14 +265,84 @@ export function ChangeCard({ summary }: { summary: string }) {
   );
 }
 
-export function Conversation({ children }: { children: ReactNode }) {
+export function Conversation({
+  children,
+  onAsk,
+  working,
+  progress,
+}: {
+  children: ReactNode;
+  /** Absent where asking is not yet possible; the box is then not offered. */
+  onAsk?: (asked: string) => void;
+  working?: boolean;
+  /** What is happening now, in the User's words. */
+  progress?: string;
+}) {
+  const [typed, setTyped] = useState("");
+
+  const send = () => {
+    if (!onAsk || working) return;
+    const asked = typed.trim();
+    if (!asked) return;
+    setTyped("");
+    onAsk(asked);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 9, height: "100%" }}>
       {children}
       <div style={{ marginTop: "auto" }}>
-        <Field placeholder={t("doc.ask_change")} style={{ fontSize: 12 }} />
+        {/* What is happening, while it happens. A minute of silence reads as a hang. */}
+        {working ? (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              fontSize: 11.5,
+              color: "var(--muted)",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              marginBottom: 7,
+            }}
+          >
+            <Spinner />
+            {progress ?? t("common.loading")}
+          </div>
+        ) : null}
+        <Field
+          placeholder={t("doc.ask_change")}
+          style={{ fontSize: 12 }}
+          value={typed}
+          disabled={working || !onAsk}
+          onChange={(event) => setTyped(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              send();
+            }
+          }}
+        />
       </div>
     </div>
+  );
+}
+
+/** A turning mark, so waiting looks like waiting rather than like nothing. */
+function Spinner() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 10,
+        height: 10,
+        border: "1.5px solid var(--border-strong)",
+        borderTopColor: "transparent",
+        borderRadius: "50%",
+        display: "inline-block",
+        animation: "spin 0.8s linear infinite",
+      }}
+    />
   );
 }
 

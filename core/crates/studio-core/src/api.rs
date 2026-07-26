@@ -59,6 +59,11 @@ pub struct Api {
     seq: AtomicU64,
     history: RwLock<Vec<Event>>,
     tx: broadcast::Sender<Event>,
+    /// What does the work. Absent when this build has nothing to think with.
+    #[cfg(feature = "adk")]
+    engine: Option<Arc<studio_runner::pipeline::Engine>>,
+    /// What the User has told Work Studio, by thread.
+    steering: RwLock<std::collections::BTreeMap<String, Vec<String>>>,
 }
 
 impl Api {
@@ -69,7 +74,55 @@ impl Api {
             seq: AtomicU64::new(0),
             history: RwLock::new(Vec::new()),
             tx,
+            #[cfg(feature = "adk")]
+            engine: None,
+            steering: RwLock::new(std::collections::BTreeMap::new()),
         })
+    }
+
+    /// The same, with something to think with.
+    #[cfg(feature = "adk")]
+    pub fn with_engine(
+        token: impl Into<String>,
+        engine: Arc<studio_runner::pipeline::Engine>,
+    ) -> Arc<Self> {
+        let (tx, _) = broadcast::channel(HISTORY);
+        Arc::new(Self {
+            token: token.into(),
+            seq: AtomicU64::new(0),
+            history: RwLock::new(Vec::new()),
+            tx,
+            engine: Some(engine),
+            steering: RwLock::new(std::collections::BTreeMap::new()),
+        })
+    }
+
+    #[cfg(feature = "adk")]
+    fn engine(&self) -> Option<Arc<studio_runner::pipeline::Engine>> {
+        self.engine.clone()
+    }
+
+    /// What the User has told Work Studio about this thread.
+    ///
+    /// Resolved here rather than sent by the renderer, so nothing influences a run that the
+    /// User cannot see and edit (Requirement 6).
+    pub async fn steering_for(&self, thread: &str) -> Vec<String> {
+        self.steering
+            .read()
+            .await
+            .get(thread)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Record something the User has told Work Studio.
+    pub async fn remember_steering(&self, thread: &str, note: impl Into<String>) {
+        self.steering
+            .write()
+            .await
+            .entry(thread.to_string())
+            .or_default()
+            .push(note.into());
     }
 
     /// Publish an event, assigning it the next sequence number.
@@ -156,6 +209,8 @@ pub fn router(api: Arc<Api>) -> Router {
         .route("/sheet", get(sheet))
         .route("/document", get(document))
         .route("/deck", get(deck))
+        // Asking for a change. A POST because it changes the User's file.
+        .route("/ask", axum::routing::post(ask))
         .with_state(api)
 }
 
@@ -200,6 +255,121 @@ macro_rules! artefact_route {
 pub struct PathQuery {
     /// Path to the User's own file.
     pub path: String,
+}
+
+/// What the User typed, and about which file.
+#[derive(Debug, Deserialize)]
+pub struct Asked {
+    /// The User's own words.
+    pub asked: String,
+    /// The file open in front of them.
+    pub path: String,
+    /// Which thread this belongs to, so the conversation continues.
+    #[serde(default)]
+    pub thread: Option<String>,
+}
+
+/// Doing what the User asked.
+///
+/// Progress goes out on the event stream as it happens rather than being buffered into the
+/// reply, because a spreadsheet edit takes the better part of a minute and silence for that
+/// long reads as a hang. The reply is the outcome.
+#[cfg(feature = "adk")]
+async fn ask(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(asked): Json<Asked>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+
+    let thread = asked.thread.unwrap_or_else(|| "this-thread".to_string());
+    let engine = match api.engine() {
+        Some(engine) => engine,
+        None => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({
+                    "problem": "Work Studio has not been set up to think yet"
+                })),
+            )
+                .into_response();
+        }
+    };
+
+    let request = studio_runner::pipeline::Request {
+        asked: asked.asked,
+        artefact: std::path::PathBuf::from(&asked.path),
+        // Steering is resolved by the Core, never sent by the renderer, so what influences
+        // a run is always something the User can see and edit.
+        steering: api.steering_for(&thread).await,
+        thread: thread.clone(),
+    };
+
+    // Progress is published as it arrives. `publish` is async and the reporter is not, so
+    // messages are handed over a channel rather than blocked on.
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let publisher = {
+        let api = Arc::clone(&api);
+        let thread = thread.clone();
+        tokio::spawn(async move {
+            while let Some(message) = rx.recv().await {
+                api.publish(EventKind::Progress {
+                    job_id: thread.clone(),
+                    message,
+                })
+                .await;
+            }
+        })
+    };
+
+    let outcome = engine
+        .run_reporting(&request, |message| {
+            let _ = tx.send(message.to_string());
+        })
+        .await;
+    drop(tx);
+    let _ = publisher.await;
+
+    match outcome {
+        Ok(outcome) => Json(serde_json::json!({
+            "said": outcome.said,
+            "changed": outcome.saved,
+            "refused": outcome.refused,
+        }))
+        .into_response(),
+        Err(error) => {
+            if let Some(detail) = error.detail() {
+                tracing_detail(detail);
+            }
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Json(serde_json::json!({ "problem": error.to_string() })),
+            )
+                .into_response()
+        }
+    }
+}
+
+/// Without the sibling checkouts there is nothing to think with, and the interface is told
+/// so plainly rather than being left to time out.
+#[cfg(not(feature = "adk"))]
+async fn ask(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(_asked): Json<Asked>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(serde_json::json!({
+            "problem": "Work Studio has not been set up to think yet"
+        })),
+    )
+        .into_response()
 }
 
 artefact_route!(document, studio_docs::read);
@@ -283,8 +453,11 @@ pub fn mint_token() -> String {
 
 #[cfg(test)]
 mod tests {
+    // `oneshot` drives the real router in-process, so these test the endpoint rather
+    // than the function behind it.
     use super::*;
     use studio_api::{StateBadge, TrayClass};
+    use tower::ServiceExt;
 
     fn job() -> JobView {
         JobView {
@@ -471,6 +644,63 @@ mod tests {
             let mut leaks = Vec::new();
             studio_api::lint::scan(&value, "", &mut leaks);
             assert!(leaks.is_empty(), "event {} leaked: {leaks:?}", event.seq);
+        }
+    }
+
+    /// Asking is a change to the User's own file, so it must need the credential like
+    /// everything else.
+    #[tokio::test]
+    async fn asking_needs_the_token() {
+        let api = Api::new("secret");
+        let app = router(api);
+        let response = app
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("POST")
+                    .uri("/ask")
+                    .header("content-type", "application/json")
+                    .body(axum::body::Body::from(
+                        r#"{"asked":"add a column","path":"/tmp/x.xlsx"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// A build with nothing to think with must say so in the User's words rather than
+    /// leaving the interface waiting.
+    #[cfg(not(feature = "adk"))]
+    #[tokio::test]
+    async fn without_an_engine_the_answer_is_plain() {
+        let api = Api::new("secret");
+        let app = router(api);
+        let response = app
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("POST")
+                    .uri("/ask")
+                    .header("authorization", "Bearer secret")
+                    .header("content-type", "application/json")
+                    .body(axum::body::Body::from(
+                        r#"{"asked":"add a column","path":"/tmp/x.xlsx"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("has not been set up to think"), "{text}");
+        for banned in ["model", "provider", "adk", "feature", "credential"] {
+            assert!(
+                !text.to_lowercase().contains(banned),
+                "leaks {banned}: {text}"
+            );
         }
     }
 }

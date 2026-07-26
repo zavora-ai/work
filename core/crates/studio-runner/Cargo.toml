@@ -15,6 +15,10 @@ adk = [
   "dep:adk-core",
   "dep:adk-agent",
   "dep:adk-tool",
+  "dep:adk-runner",
+  "dep:adk-session",
+  "dep:futures",
+  "studio-router/adk",
   "dep:async-trait",
   "dep:serde_json",
   "dep:tokio",
@@ -30,6 +34,10 @@ thiserror.workspace = true
 
 adk-core = { path = "../../../../adk-rust/adk-core", optional = true }
 adk-agent = { path = "../../../../adk-rust/adk-agent", optional = true }
+adk-runner = { path = "../../../../adk-rust/adk-runner", optional = true }
+adk-session = { path = "../../../../adk-rust/adk-session", optional = true }
+futures = { version = "0.3", optional = true }
+studio-router.workspace = true
 adk-tool = { path = "../../../../adk-rust/adk-tool", features = ["mcp"], optional = true }
 tokio = { workspace = true, optional = true }
 async-trait = { version = "0.1", optional = true }

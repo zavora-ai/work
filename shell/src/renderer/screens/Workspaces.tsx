@@ -15,6 +15,7 @@ import React, { useState } from "react";
 
 import { useSheet } from "../useSheet.ts";
 import type { DeckState, DocumentState } from "../useArtefact.ts";
+import { useAsk, type Turn } from "../useAsk.ts";
 import { t } from "../../shared/strings.ts";
 import { Button, Card, Field, Icon } from "../components/primitives.tsx";
 import { SheetGrid } from "../components/SheetGrid.tsx";
@@ -174,7 +175,9 @@ function DocumentDetails(props: {
 }
 
 export function SpreadsheetWorkspace(props: WorkspaceProps & { path?: string }) {
-  const sheet = useSheet(props.path);
+  const conversation = useAsk(props.path, "spreadsheet");
+  // Reload the grid when Work Studio has changed the file.
+  const sheet = useSheet(props.path, conversation.state.changedAt);
 
   const canvas = sheet.loading ? (
     <div style={{ width: 420, alignSelf: "flex-start" }}>
@@ -210,14 +213,14 @@ export function SpreadsheetWorkspace(props: WorkspaceProps & { path?: string }) 
       // sheet names sit on its bottom edge where a spreadsheet keeps them.
       fill={Boolean(sheet.model)}
       conversation={
-        <Conversation>
-          <Bubble from="you">Add a 12% growth case next to the base case</Bubble>
-          <Bubble from="studio">
-            Added column D with 12% applied to each month and extended the total row. The chart
-            picked it up.
-          </Bubble>
-          <ChangeCard summary="Changed 5 cells and 1 chart" />
-        </Conversation>
+        <LiveConversation
+          turns={conversation.state.turns}
+          refused={conversation.state.refused}
+          problem={conversation.state.problem}
+          working={conversation.state.working}
+          progress={conversation.state.progress}
+          onAsk={conversation.ask}
+        />
       }
       details={
         <div>
@@ -245,6 +248,45 @@ export function SpreadsheetWorkspace(props: WorkspaceProps & { path?: string }) 
         </div>
       }
     />
+  );
+}
+
+/**
+ * The conversation, from what was actually said.
+ *
+ * Falls back to nothing rather than to invented dialogue: a panel showing a conversation
+ * that never happened is worse than an empty one, because the User cannot tell which is
+ * which.
+ */
+function LiveConversation(props: {
+  turns: Turn[];
+  refused: string[];
+  problem?: string;
+  working: boolean;
+  progress?: string;
+  onAsk: (asked: string) => void;
+}) {
+  return (
+    <Conversation onAsk={props.onAsk} working={props.working} progress={props.progress}>
+      {props.turns.map((turn, index) => (
+        <Bubble key={index} from={turn.from}>
+          {turn.text}
+        </Bubble>
+      ))}
+      {props.problem ? <Bubble from="studio">{props.problem}</Bubble> : null}
+      {props.refused.length > 0 ? (
+        <Card>
+          <div style={{ fontSize: 11.5, fontWeight: 650, marginBottom: 4 }}>
+            {t("kickoff.not_done")}
+          </div>
+          {props.refused.map((line, index) => (
+            <div key={index} style={{ fontSize: 11.5, color: "var(--muted)" }}>
+              {line}
+            </div>
+          ))}
+        </Card>
+      ) : null}
+    </Conversation>
   );
 }
 

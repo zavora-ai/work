@@ -37,6 +37,14 @@ export interface StudioBridge {
    */
   openFile(): Promise<string | undefined>;
 
+  /**
+   * Ask Work Studio to change the open file.
+   *
+   * Answers when the work is finished. Progress arrives on the event stream in the
+   * meantime, because the work takes long enough that silence would read as a hang.
+   */
+  ask(request: { asked: string; path: string; thread?: string }): Promise<unknown>;
+
   sheet(path: string): Promise<unknown>;
 
   /**

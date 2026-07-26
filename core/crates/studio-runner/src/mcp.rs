@@ -70,7 +70,33 @@ pub struct Server {
     pub toolset: McpToolset<()>,
 }
 
+/// The server's toolset, shareable.
+///
+/// `Server` owns its toolset and the pipeline still needs the server afterwards — to ask
+/// what operations it exposes — so the agent is given a handle that borrows through the
+/// same `Arc` rather than a copy that could drift from it.
+pub struct SharedToolset(Arc<Server>);
+
+#[async_trait::async_trait]
+impl adk_core::Toolset for SharedToolset {
+    fn name(&self) -> &str {
+        &self.0.spec.name
+    }
+
+    async fn tools(
+        &self,
+        ctx: Arc<dyn adk_core::ReadonlyContext>,
+    ) -> adk_core::Result<Vec<Arc<dyn adk_core::Tool>>> {
+        adk_core::Toolset::tools(&self.0.toolset, ctx).await
+    }
+}
+
 impl Server {
+    /// A toolset an agent can hold, backed by this same server.
+    pub fn toolset_for_agent(self: Arc<Self>) -> Arc<dyn adk_core::Toolset> {
+        Arc::new(SharedToolset(self))
+    }
+
     /// Start the server and connect over stdio.
     pub async fn start(spec: ServerSpec) -> Result<Self, String> {
         let mut command = Command::new(&spec.command);

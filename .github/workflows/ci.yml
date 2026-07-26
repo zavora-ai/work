@@ -111,6 +111,7 @@ jobs:
 
       # Fails if any server exposes an operation nobody classified. Without the servers
       # built above these tests would skip, which is why the build step is not optional.
+      # Also covers the Core with its engine enabled, which is the build a release ships.
       - name: The three specialists
         run: make adk-check
 

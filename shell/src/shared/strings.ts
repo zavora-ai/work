@@ -126,6 +126,7 @@ export const CATALOGUE = {
 
   // ---- documents ----
   "new.open_a_file": p("Open a file"),
+  "kickoff.not_done": p("What I left alone"),
   "doc.blocks": p("paragraphs"),
   "doc.selected_block": p("This paragraph is selected"),
   "doc.no_headings": p("No headings yet"),
