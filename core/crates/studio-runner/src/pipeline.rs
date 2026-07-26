@@ -286,46 +286,6 @@ impl SheetAction {
     }
 }
 
-/// Turn a reply that says "error" into one.
-///
-/// The capability servers answer with a status in the body rather than by failing the call, which
-/// is reasonable of them and means a caller that only checks for transport failure sees every
-/// refusal as a success.
-fn refusal_in(answer: &str) -> Result<(), RunError> {
-    // The reply arrives wrapped: a JSON value whose text is itself JSON, sometimes inside a
-    // content array. So the status is looked for wherever it is, rather than assumed to be at the
-    // top — which is why the first version of this check passed every refusal through.
-    fn refusal_within(value: &serde_json::Value) -> Option<String> {
-        match value {
-            serde_json::Value::String(text) => serde_json::from_str::<serde_json::Value>(text)
-                .ok()
-                .and_then(|inner| refusal_within(&inner)),
-            serde_json::Value::Object(map) => {
-                if map.get("status").and_then(|status| status.as_str()) == Some("error") {
-                    return Some(
-                        map.get("message")
-                            .and_then(|message| message.as_str())
-                            .unwrap_or("the connection refused it")
-                            .to_string(),
-                    );
-                }
-                map.values().find_map(refusal_within)
-            }
-            serde_json::Value::Array(items) => items.iter().find_map(refusal_within),
-            _ => None,
-        }
-    }
-
-    let Ok(body) = serde_json::from_str::<serde_json::Value>(answer) else {
-        // Not JSON at all. Nothing to object to.
-        return Ok(());
-    };
-    match refusal_within(&body) {
-        Some(detail) => Err(RunError::Failed { detail }),
-        None => Ok(()),
-    }
-}
-
 /// A selection split into its label column and its number columns.
 ///
 /// "A5:C8" becomes labels in A5:A8 and numbers in B5:B8 and C5:C8 — which is what a spreadsheet
@@ -992,23 +952,20 @@ impl Engine {
             object.insert("workbook_id".to_string(), serde_json::json!(handle));
         }
 
-        let answer = server
+        // `call` refuses on an error reply, for every operation and every caller — see
+        // `mcp::refusal_in`.
+        server
             .call(operation, arguments)
             .await
             .map_err(|detail| RunError::Failed { detail })?;
-        // The call succeeding is not the operation succeeding. Every reply carries a status, and
-        // a refusal comes back as a perfectly well-delivered message saying no — so without this
-        // the interface reported "you added a chart" for a chart that was never added.
-        refusal_in(&answer)?;
 
-        let saved = server
+        server
             .call(
                 "save_workbook",
                 serde_json::json!({ "workbook_id": handle, "file_path": path }),
             )
             .await
             .map_err(|detail| RunError::Failed { detail })?;
-        refusal_in(&saved)?;
         Ok(())
     }
 

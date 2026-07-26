@@ -136,6 +136,42 @@ impl Server {
                 map
             }
         };
+        let answer = self
+            .toolset
+            .call_tool_value(operation, map)
+            .await
+            .map(|value| value.to_string())
+            .map_err(|e| e.to_string())?;
+
+        // A delivered reply is not a successful operation. These servers answer a refusal with a
+        // status in the body rather than by failing the call, so a caller that checks only for
+        // transport failure treats every refusal as a success — which is how "you added a chart"
+        // came to be said about a chart that was never added. Checked here, once, because eleven
+        // call sites checking it themselves is ten chances to forget.
+        if let Some(refused) = refusal_in(&answer) {
+            return Err(refused);
+        }
+        Ok(answer)
+    }
+
+    /// Call an operation and hand back whatever it says, refusal included.
+    ///
+    /// For the few places where "no" is information rather than a failure — asking whether
+    /// something exists, for instance.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub async fn call_allowing_refusal(
+        &self,
+        operation: &str,
+        arguments: serde_json::Value,
+    ) -> Result<String, String> {
+        let map = match arguments {
+            serde_json::Value::Object(map) => map,
+            other => {
+                let mut map = serde_json::Map::new();
+                map.insert("input".to_string(), other);
+                map
+            }
+        };
         self.toolset
             .call_tool_value(operation, map)
             .await
@@ -672,5 +708,76 @@ pub mod test_support {
         Arc::new(Bare {
             content: adk_core::Content::new("user"),
         })
+    }
+}
+
+/// The message in a reply that says "error", if it says so.
+///
+/// The status can be nested: the reply is a JSON value whose text is itself JSON, sometimes inside
+/// a content array. So it is looked for wherever it is rather than assumed to be at the top —
+/// assuming that is why the first version of this check passed every refusal through.
+fn refusal_in(answer: &str) -> Option<String> {
+    fn within(value: &serde_json::Value) -> Option<String> {
+        match value {
+            serde_json::Value::String(text) => serde_json::from_str::<serde_json::Value>(text)
+                .ok()
+                .and_then(|inner| within(&inner)),
+            serde_json::Value::Object(map) => {
+                if map.get("status").and_then(|status| status.as_str()) == Some("error") {
+                    return Some(
+                        map.get("message")
+                            .and_then(|message| message.as_str())
+                            .unwrap_or("the connection refused it")
+                            .to_string(),
+                    );
+                }
+                map.values().find_map(within)
+            }
+            serde_json::Value::Array(items) => items.iter().find_map(within),
+            _ => None,
+        }
+    }
+
+    serde_json::from_str::<serde_json::Value>(answer)
+        .ok()
+        .and_then(|body| within(&body))
+}
+
+#[cfg(test)]
+mod refusal_tests {
+    use super::refusal_in;
+
+    #[test]
+    fn a_plain_success_is_not_a_refusal() {
+        let reply = serde_json::json!({ "status": "success", "message": "Saved" }).to_string();
+        assert_eq!(refusal_in(&serde_json::json!(reply).to_string()), None);
+    }
+
+    /// The shape these servers actually answer in: JSON inside a JSON string.
+    #[test]
+    fn a_refusal_nested_in_a_string_is_found() {
+        let inner = serde_json::json!({
+            "status": "error",
+            "message": "Sheet 'Nope' not found"
+        })
+        .to_string();
+        let wrapped = serde_json::json!(inner).to_string();
+        assert_eq!(
+            refusal_in(&wrapped).as_deref(),
+            Some("Sheet 'Nope' not found")
+        );
+    }
+
+    #[test]
+    fn a_refusal_inside_a_content_array_is_found() {
+        let inner = serde_json::json!({ "status": "error", "message": "no" }).to_string();
+        let wrapped =
+            serde_json::json!({ "content": [{ "type": "text", "text": inner }] }).to_string();
+        assert_eq!(refusal_in(&wrapped).as_deref(), Some("no"));
+    }
+
+    #[test]
+    fn something_that_is_not_json_is_left_alone() {
+        assert_eq!(refusal_in("saved"), None);
     }
 }
