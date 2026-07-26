@@ -177,6 +177,14 @@ Multi-user collaboration and real-time co-presence; mobile and web clients; a ma
 8. THE Work_Studio SHALL present Global_Steering_Notes in Settings as an editable list on the same terms as per-Job notes, showing for each note its scope and where it came from.
 9. WHERE a per-Job Steering_Note and a Global_Steering_Note conflict, THE Work_Studio SHALL prefer the per-Job note, and SHALL state this precedence to the User in the Global_Steering_Note list.
 10. THE Work_Studio SHALL apply the same visibility rule to Global_Steering_Notes as to per-Job notes: no global preference influences any Job_Run unless it appears in that list.
+11. THE Work_Studio SHALL hold what it knows about the User in four kinds, each recorded with where it came from: what the User **told** it, what it **observed** the User correcting, what it **learned when something went wrong**, and what it **remembers of a continuing thread**.
+12. WHEN Work_Studio derives a preference it was not told, THE Work_Studio SHALL present it to the User for acceptance and SHALL NOT allow it to influence any Job_Run until the User has accepted it.
+13. THE Work_Studio SHALL derive an observed preference only from changes the User themselves made to Work_Studio's own output, as recorded in the Artefact change log, and SHALL NOT derive one from the content of any Artefact.
+14. THE Work_Studio SHALL show, for every note, where it came from in the User's terms, naming the Artefact and when.
+15. WHEN the same correction recurs, THE Work_Studio SHALL raise that note's standing; WHEN a note is contradicted by a later correction, THE Work_Studio SHALL stop applying it and SHALL say so in the list.
+16. THE Work_Studio SHALL scope each note to everything, to an Artefact kind, or to a class of document, and SHALL NOT apply a note outside its scope.
+17. THE Work_Studio SHALL keep a short account of each continuing thread so that returning to a piece of work does not begin again, and SHALL present it as an entry the User can read and delete.
+18. THE Work_Studio SHALL keep everything it knows about the User on the User's own computer, and WHERE similarity search is used, THE Work_Studio SHALL compute it over the notes themselves and never over Artefact content.
 
 ### Requirement 9: Proactive Scheduling and Execution
 
@@ -380,3 +388,18 @@ Multi-user collaboration and real-time co-presence; mobile and web clients; a ma
 9. THE Work_Studio SHALL keep opening an Artefact in an external application available as a secondary action, and SHALL NOT present it as the primary route to editing.
 10. WHEN a direct User edit would affect content the underlying engine cannot round-trip, THE Artefact_Client SHALL prevent the edit and explain why, rather than perform it lossily.
 11. THE Artefact_Client SHALL support keyboard-only editing for every operation it offers directly.
+
+### Requirement 23: Authored Competence
+
+**User Story:** As a User, I want the product to already know how work like mine is normally done — how a contract is reviewed, how a board paper is laid out — so that I am not teaching it the basics before it is useful to me.
+
+#### Acceptance Criteria
+
+1. THE Work_Studio SHALL hold authored competence as data on disk rather than in program code, so that a body of know-how can be added without changing the application.
+2. THE Work_Studio SHALL name each body of know-how in one line within the instruction that guides a specialist, and SHALL load its full content only when the work at hand calls for it.
+3. THE Work_Studio SHALL show the User which bodies of know-how a specialist has, in Settings, and SHALL allow each to be turned off.
+4. THE Work_Studio SHALL NOT allow authored competence to widen what a specialist may do; the operations available remain exactly those in the authored classification table.
+5. WHERE authored competence and something the User has told Work_Studio disagree, THE Work_Studio SHALL prefer what the User told it.
+6. THE Work_Studio SHALL state, when it has followed a body of know-how, which one it followed, in the User's terms.
+7. THE Work_Studio SHALL keep the instruction that guides each specialist as editable content rather than as program code, and SHALL show it in Settings.
+

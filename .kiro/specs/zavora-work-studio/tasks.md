@@ -466,6 +466,109 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
     - Implement drafting at `balanced` tier with Kickoff_Review suppression of the post and Out Tray reversal after going live
     - _Requirements: 4.1, 5.2, 7.3_
 
+- [ ] 19. What a specialist knows — earned knowledge and authored competence
+
+  The product's defensibility is here rather than in the editing, which will not stay a
+  differentiator. The signal is already being recorded and discarded: the change log holds an
+  author per edit, so the difference between what Work Studio produced and what the User then
+  changed is an observed preference. This phase turns that into something the specialists draw
+  on, and pairs it with know-how we author once.
+
+  Ordered so the visible half works first. The steering list already claims to be everything
+  Work Studio goes on, and today it is fixture text — so the first task is the one that makes
+  an existing claim true.
+
+  - [ ] 19.1 Make the steering list real, end to end
+    - Serve Steering_Notes from the store over the loopback channel: read, add, reword,
+      deactivate, delete, for both per-thread and global notes.
+    - Replace the fixture list in the Job detail and Settings panes with the real one.
+    - Resolve notes in the Core when a run starts, never accept them from the renderer, so
+      nothing influences a run that the User cannot see.
+    - Test: a note added in the interface changes the next run's instruction; a deactivated
+      one does not; per-thread beats global.
+    - _Requirements: 8.1, 8.2, 8.3, 8.7, 8.8, 8.9, 8.10_
+    - _Properties: 28, 29_
+
+  - [ ] 19.2 Record provenance for every note
+    - Each note carries where it came from in the User's terms: the Artefact and when, or
+      that the User said it directly.
+    - Show it in both lists, as the design already draws it.
+    - Test: no note can be presented without a provenance the interface can render.
+    - _Requirements: 8.11, 8.14_
+    - _Properties: 35_
+
+  - [ ] 19.3 Derive observed preferences from the change log
+    - Find, in `artefact_changes`, places where Work Studio made a change and the User then
+      changed the same thing, and describe the difference as a candidate preference.
+    - Derive only from changes whose author is the User, and never from Artefact content.
+    - Scope each candidate to the Artefact kind and document class it was seen in.
+    - Test: a candidate is produced from a real pair of edits; no candidate is ever produced
+      from document text, asserted by feeding a document containing instructions.
+    - _Requirements: 8.11, 8.13, 8.16_
+    - _Properties: 34, 37_
+
+  - [ ] 19.4 Ask before acting on anything derived
+    - Present a candidate as a proposal in the User's words — "You have shortened my summaries
+      three times. Shall I keep them under 150 words?" — with accept, reword and dismiss.
+    - A candidate influences nothing until accepted; on acceptance it becomes an ordinary
+      note in the list.
+    - Test: a pending candidate provably changes no run; an accepted one changes the next.
+    - _Requirements: 8.4, 8.12_
+    - _Properties: 33_
+
+  - [ ] 19.5 Standing and forgetting
+    - A recurring correction raises a note's standing; a contradicting one stops it applying
+      and says so in the list rather than removing it silently.
+    - Test: after a contradicting correction, no subsequent run reflects the note, and the
+      list shows why.
+    - _Requirements: 8.15_
+    - _Properties: 36_
+
+  - [ ] 19.6 Learn from what went wrong
+    - Feed reversals, refusals by the gate, and rejected Kickoff_Reviews in as their own kind
+      of note, so the same mistake is not repeated.
+    - Test: a reversed delivery produces a note that is visible and scoped.
+    - _Requirements: 8.11_
+
+  - [ ] 19.7 Keep a thread's account
+    - Summarise a continuing thread so returning to it does not begin again; present it as
+      something the User can read and delete.
+    - Test: a thread reopened after the process ended carries its account.
+    - _Requirements: 8.17_
+
+  - [ ] 19.8 Externalise the persona
+    - Move each specialist's instruction out of program code into editable content, assembled
+      per run, and show it in Settings.
+    - Test: editing the content changes the next run's instruction; the User's notes still
+      come last.
+    - _Requirements: 23.7, 23.5_
+    - _Properties: 39_
+
+  - [ ] 19.9 Authored competence, disclosed in two levels
+    - Load `SKILL.md` packs from disk with `adk-skill`; carry one catalogue line per pack in
+      the instruction and load a body only when the work calls for it.
+    - Show each specialist's packs in Settings with a way to turn one off.
+    - Say which body of know-how was followed, in the User's terms.
+    - Test: a pack added on disk appears without a code change; the instruction grows by one
+      line per pack, not by a body; a disabled pack is not offered.
+    - _Requirements: 23.1, 23.2, 23.3, 23.6_
+
+  - [ ] 19.10 Know-how cannot widen authority
+    - Assert that no enabled pack changes the set of operations a specialist may perform.
+    - Test: with every pack enabled, the operation set equals the authored classification
+      table exactly.
+    - _Requirements: 23.4_
+    - _Properties: 38_
+
+  - [ ] 19.11 Similarity search over notes, locally
+    - Retrieve notes by meaning rather than by keyword, computed over the notes themselves and
+      never over Artefact content, on the User's own computer.
+    - Keyword retrieval is the first implementation; this replaces it behind the same
+      interface when there is enough remembered for keyword to feel thin.
+    - Test: nothing derived from a note leaves the computer; retrieval respects scope.
+    - _Requirements: 8.18, 16.1_
+    - _Properties: 37, 40_
+
 - [ ] 15. Privacy, Settings and data control
   - [ ] 15.1 Implement Settings as a single screen with six sections
     - Implement **General**: AI key with provider status and replace/add, the cost-versus-quality nudge, launch at login, file location, daily limit with today's usage, and export/delete actions

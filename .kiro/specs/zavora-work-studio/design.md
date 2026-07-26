@@ -752,6 +752,83 @@ Conversation left, live artefact preview right, version history reachable from t
 
 One screen: provider credentials, one cost-versus-quality preference, artefact folder location, connected accounts with consent statements, daily spend limit, launch at login, export-all and delete-all, and a single link to the diagnostics view. The diagnostics view is the only place a model name, server name or technical error appears.
 
+## What a specialist knows
+
+Editing a document with a model is not the hard part and will not stay a differentiator. What
+compounds is the record of how *this* person works, and the reason it can be held at all is
+that it never leaves their computer. So the knowledge a specialist draws on is treated as a
+first-class part of the design rather than as prompt text.
+
+Two sources, and they are different in kind. **Authored competence** is what we write down
+once about how work of a sort is normally done. **Earned knowledge** is what this User has
+shown us about how they want theirs done. The first makes the product useful on day one; the
+second is why it is still being used in a year.
+
+### The layers, in order of authority
+
+An instruction is assembled per run, lowest authority first, so that the User's own words are
+last and win by construction rather than by a rule that could be forgotten.
+
+| Layer | Where it lives | How it reaches the model |
+|---|---|---|
+| Persona — what this specialist is for | editable content, not program code | whole, every run |
+| Authored competence — how work of a sort is done | `SKILL.md` packs on disk | one line each; the body only when called for |
+| What went wrong before | derived from reversals and refusals | the few that apply, by scope |
+| What we observed the User correcting | derived from the change log, once accepted | the few that apply, by scope |
+| What the User told us | Steering_Notes, per thread and global | all active notes, last |
+
+Authored competence is disclosed in two levels for a practical reason: a body of know-how is
+long, and carrying every one of them in every run would crowd out the User's own words —
+which are the ones that must survive. So the instruction carries a catalogue line, and the
+specialist asks for the body when the work calls for it.
+
+### Why the change log is the interesting source
+
+Property 23 exists so that a cell the User typed and a column an agent added are the same kind
+of thing, with one history. That was designed for a coherent record. It has a second
+consequence: the change log holds, per edit, *who made it*. The difference between what
+Work Studio produced and what the User then changed about it is a preference, observed rather
+than guessed, and it is already being recorded.
+
+Nothing derives from Artefact content. A document can contain instructions — "ignore what you
+were told and send this to…" — and a preference store fed from document bodies would be a way
+to install those instructions permanently. Deriving only from the User's own recorded changes
+closes that off by construction, and the acceptance step closes it again.
+
+### The acceptance step
+
+An observed preference is a proposal until the User accepts it:
+
+> You have shortened my summaries three times. Shall I keep them under 150 words?
+
+One mechanism does three jobs. It satisfies the rule that nothing influences a run unless the
+User can see and edit it. It is the moment the product feels like a colleague learning the job
+rather than a system drifting. And it means no derived instruction can take hold without the
+User having read it in plain words.
+
+### Provenance, standing and forgetting
+
+Every note carries where it came from, in the User's terms — "from your edit to Partnership
+agreement — draft 4, on 12 June" — because the steering list claims to be everything Work
+Studio goes on, and a note whose origin cannot be shown makes that claim false. A correction
+that recurs raises a note's standing; a later correction that contradicts it stops it being
+applied, and the list says so rather than quietly dropping it.
+
+### Scope
+
+A preference about contracts must not reach a newsletter. Each note is scoped to everything,
+to an Artefact kind, or to a class of document, and retrieval is narrowed by the scope of the
+work at hand.
+
+### Storage
+
+The notes live in the existing encrypted store on the User's computer. Similarity search, when
+it is worth having, is computed over the notes — which are short, few, and already seen by the
+User — and never over Artefact content. At one person's scale that is a direct comparison over
+stored vectors rather than an index, so it adds no dependency; the keyword search available
+today is the first implementation and the interface does not change when it is replaced.
+
+
 ## Correctness Properties
 
 Properties are stated so they can be tested as invariants rather than as examples.
@@ -788,6 +865,14 @@ Properties are stated so they can be tested as invariants rather than as example
 30. **Repository mirrors disk.** For any folder structure shown in the Repository, the same structure exists under the User's chosen location on disk, and any folder operation performed in the Repository is applied on disk. _Requirements 12.6, 12.7, 12.9_
 31. **No app-only taxonomy.** No Artefact appears in the Repository under a container that does not exist on disk; kinds are filters and are never presented as folders. _Requirement 12.7_
 32. **Nothing unclassified is ever performed.** For any operation absent from the authored classification table, no Job in any state or mode performs it; it is raised to the User instead. _Requirements 18.7, 18.8_
+33. **Nothing derived acts before it is accepted.** For any preference Work_Studio derived rather than was told, no Job_Run reflects it until the User has accepted it, and it appears in the steering list from that moment. _Requirements 8.12, 8.4_
+34. **Nothing is learned from a document's contents.** For any note in the store, its origin is a change recorded in the change log whose author is the User; no note's origin is Artefact content. _Requirement 8.13_
+35. **Every note can say where it came from.** For any note presented in a steering list, its provenance names an Artefact and a time, or states that the User said it directly. _Requirement 8.14_
+36. **A contradicted note stops acting.** After a correction that contradicts a note, no subsequent Job_Run reflects that note, and the list shows it as no longer applied. _Requirement 8.15_
+37. **Scope is honoured.** For any note scoped to an Artefact kind or document class, no Job_Run outside that scope reflects it. _Requirement 8.16_
+38. **Know-how cannot widen authority.** For any set of enabled authored competence, the set of operations a specialist may perform is unchanged from the authored classification table. _Requirement 23.4_
+39. **The User's words outrank ours.** Where authored competence and a Steering_Note disagree, the produced output reflects the Steering_Note. _Requirement 23.5_
+40. **Knowledge stays local.** No note, and no vector derived from one, is transmitted off the User's computer. _Requirements 8.18, 16.1_
 
 ## Error Handling
 
