@@ -48,6 +48,38 @@ Verified by `make ci` — formatting, clippy with `-D warnings`, 174 Core tests,
 | 3.1 Job model and state machine | Done | `studio-jobs`: `JobKind`, `JobState`, closed transition sets, read-only activation path. |
 | 3.2 Property 4 test | Done | `property_4_transition_set_is_closed_per_kind` is exhaustive over every `(kind, from, to)` triple; `property_4_rejection_does_not_mutate` proves rejection leaves state untouched. |
 
+### The spreadsheet MVP, end to end
+
+Driven in the built application rather than only in tests: the folder created on first run
+and counted from disk, a file opened by clicking it, a cell changed by hand, a column asked
+for in words landing in the right rows with the User's own edit intact, notes kept per file,
+then the application quit and relaunched with the work, the conversation and the notes still
+there.
+
+| Task | State | Evidence |
+|---|---|---|
+| Real home folder | Done | `studio-artefacts::home`, 5 tests; `Documents › Work Studio` created on first run, which makes two claims the interface already made true |
+| Real folder listing | Done | `/files`; "1 file, 0 folders on your Mac" counted from disk; a file it cannot open is shown but not offered |
+| Persistence | Done | `keeper.rs`, 9 tests including one that reopens the store as after a restart; migration `0002_thread_turns` |
+| Your work | Done | `/threads`; the sidebar lists pieces of work the User has done, and clicking one reopens its file |
+| Conversation kept | Done | turns stored per piece of work and loaded when it is reopened |
+| Steering, real | Done | `/steering`; every note shows where it came from; anything derived is asked as a question and influences nothing until accepted |
+| Editing by hand | Done | `/edit` through the same gate and the same server as an agent's change; a typed number stays a number |
+| Honest figures | Done | the Dashboard reports unavailable rather than inventing; the route switcher no longer appears in the desktop application |
+
+Three bugs this found, each of which silently lost the User's work:
+
+- **`zavora-xlsx` discarded any change to a cell that already had a value.** The parsed
+  original was inserted over the authored write, so adding a cell worked and changing one did
+  not, with a success message either way. It had already bitten us unnoticed: an earlier run
+  reported renaming a header and the file still held the old text. One line; the engine's own
+  567 tests still pass.
+- **A typed value was sent as text**, so `1999` became a string and every formula referring
+  to it broke.
+- **The specialist was told only the path**, so it assumed the table began at row 1 when it
+  began at row 5 and wrote a column of formulas against empty cells. It is now told what is
+  actually in the file.
+
 ### Built, but not yet real
 
 A checkbox is a poor record for a screen that exists and reads correctly but shows
@@ -351,7 +383,7 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
   - [ ] 12.4 Implement the intent router
     - Implement `fast`-tier classification returning Artefact type and confidence; below threshold ask exactly one outcome-framed question, never naming an agent or engine
     - _Requirements: 10.1, 10.2, 10.3_
-  - [ ] 12.5 Implement the New work entry state
+  - [x] 12.5 Implement the New work entry state
     - Implement the single intent field, the file drop target, the recurring-work template cards, and the recent-threads list showing last author, editing application where known, and derivation provenance
     - _Requirements: 10.6, 10.7_
     - _Journey: J6_
@@ -375,7 +407,7 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
   - [x]* 12.7 Write property tests: single edit path
     - **Property 23: Single edit path** — every change, User- or Studio-originated, appears in the change log as an authored `Edit_Operation` and reverts by the same mechanism. **Validates: Requirements 11.4, 22.4**
     - **Property 24: No unloggable edit** — no client offers a direct edit whose effect cannot be expressed as an `Edit_Operation`. **Validates: Requirement 22.5**
-  - [ ] 12.8 Port the spreadsheet editing client
+  - [x] 12.8 Port the spreadsheet editing client
     - Port `XlsxPreview.tsx`, `useSpreadsheet.ts`, `Ribbon`, `FormattingToolbar`, `ChartPicker`, `PivotWizard`, `ConditionalFormatPanel`, `ValidationBuilder`, `CommentPanel`, `NamedRangeManager`, `ProtectionDialog`, `SheetInspector` and `ChartRenderer` from `excel-agent-app/frontend` onto the shared shell
     - Repoint `toolApi.ts` at the Core's `Edit_Operation` dispatcher; strip `LoginPage`, `AdminDashboard`, `WorkspaceSidebar` and all Postgres/JWT assumptions
     - Verify formula recalculation happens in app via `zavora-xlsx`'s formula engine, with no external application required
@@ -403,7 +435,7 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
   - [ ] 13.4 Implement multi-artefact composition
     - Compose Artefact_Agents within a single User-visible task using a `SequentialAgent`, presenting one result
     - _Requirements: 10.4_
-  - [ ] 13.5 Implement open-from-disk and version history views
+  - [x] 13.5 Implement open-from-disk and version history views
     - Implement opening an existing Artefact into the surface and continuing work
     - Implement the plain-language change history view with revert
     - _Requirements: 10.6, 11.5_
@@ -478,7 +510,7 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
   Work Studio goes on, and today it is fixture text — so the first task is the one that makes
   an existing claim true.
 
-  - [ ] 19.1 Make the steering list real, end to end
+  - [x] 19.1 Make the steering list real, end to end
     - Serve Steering_Notes from the store over the loopback channel: read, add, reword,
       deactivate, delete, for both per-thread and global notes.
     - Replace the fixture list in the Job detail and Settings panes with the real one.
@@ -489,7 +521,7 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
     - _Requirements: 8.1, 8.2, 8.3, 8.7, 8.8, 8.9, 8.10_
     - _Properties: 28, 29_
 
-  - [ ] 19.2 Record provenance for every note
+  - [x] 19.2 Record provenance for every note
     - Each note carries where it came from in the User's terms: the Artefact and when, or
       that the User said it directly.
     - Show it in both lists, as the design already draws it.
