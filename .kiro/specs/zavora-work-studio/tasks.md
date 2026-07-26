@@ -48,6 +48,34 @@ Verified by `make ci` — formatting, clippy with `-D warnings`, 174 Core tests,
 | 3.1 Job model and state machine | Done | `studio-jobs`: `JobKind`, `JobState`, closed transition sets, read-only activation path. |
 | 3.2 Property 4 test | Done | `property_4_transition_set_is_closed_per_kind` is exhaustive over every `(kind, from, to)` triple; `property_4_rejection_does_not_mutate` proves rejection leaves state untouched. |
 
+### Built, but not yet real
+
+A checkbox is a poor record for a screen that exists and reads correctly but shows
+invented data. These tasks are not complete, and saying only "open" would understate them
+just as marking them done would overstate them. Each is drawn, reachable, and fed from
+`shell/src/renderer/fixtures.ts` rather than from the store.
+
+| Task | Drawn | What it still shows | What it needs |
+|---|---|---|---|
+| 9.2 Dashboard | Yes | `5 / 3 / 11 / $0.62`, all invented | Counts from the store; spend from `spend_ledger`, which now carries real money. A figure we do not have must be reported unavailable, never as zero |
+| 9.3 In Tray | Yes | Three fixture items | `tray_items` |
+| 9.5 Out Tray | Yes | Three fixture deliveries | `deliveries`, which is why 4.5 is a prerequisite |
+| 9.6 Job detail | Yes | Fixture run history and steering notes | `job_runs` and `steering_notes` |
+| 9.4 Kickoff | Yes | A fixture manifest, so approving approves nothing | The manifest the gate already produces |
+| 12.5 New work | Yes | The "describe it" box does nothing | Task 12.4, the intent router |
+| 15.1 Settings | Yes | Accounts, spend limit, folders, tiers — none persist or take effect | Writes, and something that reads them |
+| 15.5 Diagnostics | Yes | Fixture activity and build detail | `activity_log`, which exists and is append-only |
+| 12.8 / 13.8 / 13.9 editing clients | Yes | The User can select but not type: no cell, paragraph or shape is editable by hand | The one edit path both authors share (Property 23) |
+
+Two statements the interface makes are currently untrue, which ranks above any of the
+above: it says "Your files live in Documents › Work Studio on your Mac" and "Folders here
+are real folders on your Mac", while that folder does not exist and the 14 files listed are
+invented.
+
+The store is the common thread. All 12 tables exist and are tested, and the Core's HTTP
+surface writes to none of them, so closing the app forgets everything that happened in it.
+
+
 Also verified ahead of their tasks: Property 17 (an irreversible delivery cannot claim a reversal window), the four-class tray constraint, one-off Jobs carrying no schedule, and steering scope matching ownership — all enforced by schema `CHECK` constraints rather than application code.
 
 Both guardrails from task 2's checkpoint are now demonstrably working: planting the four labels the original hand-drawn mockup used makes `vocab-lint` exit 1 and fails `property_11`; removing them returns it to `101 strings checked, all clean`.
@@ -71,7 +99,7 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
 ## Tasks
 
 - [ ] 1. Workspace and guardrail foundations
-  - [ ] 1.1 Create the Cargo workspace and Core binary skeleton
+  - [x] 1.1 Create the Cargo workspace and Core binary skeleton
     - Create `core/` Cargo workspace with crates `studio-core` (binary), `studio-jobs`, `studio-tray`, `studio-artefacts`, `studio-router`, `studio-connectors`, `studio-store`
     - Add `adk-runner`, `adk-agent`, `adk-core`, `adk-session`, `adk-artifact`, `adk-tool` (mcp feature), `adk-skill`, `adk-graph`, `adk-guardrail` as dependencies
     - Enable the `standard` feature tier on `adk-rust` so OpenAI is available; verify Gemini-only `minimal` default is not in effect
@@ -138,7 +166,7 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
     - **Property 2: Auto-approval is never authorisation** — gate decisions are identical with and without `autoApprove` present. **Validates: Requirement 18.4**
     - **Property 17: Reversal honesty** — no `irreversible` delivery offers reversal and every offered reversal has a `reversible` or `partial` descriptor. **Validates: Requirements 7.3, 7.4**
     - **Property 32: Nothing unclassified is ever performed** — an operation absent from the table is refused in every state and mode. **Validates: Requirements 18.7, 18.8**
-  - [ ] 3.5 Implement the run pipeline
+  - [x] 3.5 Implement the run pipeline
     - Implement the seven pipeline stages: acquire lease, assemble context, resolve tier, execute via `Runner`, gate side effects, record in one transaction, route result
     - Implement the per-Job lease so runs of the same Job never overlap
     - Record `job_runs`, Artefacts, Deliveries, Spend and Activity_Log entries transactionally
@@ -316,7 +344,7 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
     - **Property 10: External edit preservation**
     - If an Artefact changed on disk since the last recorded hash, no Studio edit discards those changes
     - **Validates: Requirement 11.6**
-  - [ ] 12.3 Implement the Spreadsheet agent
+  - [x] 12.3 Implement the Spreadsheet agent
     - Mount `worksheet-mcp` and load spreadsheet instructions through `adk-skill`'s `SkillInjector`, seeded from `zavora-cli/.skills/xlsx.md`
     - Implement the conversation-plus-live-preview layout using the excel-agent-app pattern as the UX reference, with direct grid edits round-tripping through the same tool surface
     - _Requirements: 10.5, 11.1_
@@ -337,7 +365,7 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
   - [ ]* 12.5c Write property tests: Repository fidelity
     - **Property 30: Repository mirrors disk** — every folder shown exists on disk and every folder operation is applied there. **Validates: Requirements 12.6, 12.7, 12.9**
     - **Property 31: No app-only taxonomy** — no Artefact appears under a container absent from disk; kinds never render as folders. **Validates: Requirement 12.7**
-  - [ ] 12.6 Implement the shared Artefact_Client shell
+  - [x] 12.6 Implement the shared Artefact_Client shell
     - Implement the common shell used by all three clients: selection model, contextual toolbar, change badges with author attribution and per-change reversal, version history panel, and a secondary "open elsewhere" action that is not the primary editing route
     - Implement the optimistic local model and reconciliation: local application first, Core render authoritative on divergence
     - Implement the `Edit_Operation` dispatcher so User edits traverse the same MCP tool surface as Artefact_Agent edits, producing one change log
@@ -358,7 +386,7 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
     - **Validates: Requirements 11.2, 11.3**
 
 - [ ] 13. Document and presentation agents and their editing clients
-  - [ ] 13.1 Implement the Document agent with a fidelity probe
+  - [x] 13.1 Implement the Document agent with a fidelity probe
     - Mount `docx-mcp`; load instructions from the existing `docx` and `doc-coauthoring` skills
     - Implement the pre-edit fidelity probe for User-supplied `.docx`: open, save to a temporary file, compare structural inventory; on detected loss, inform the User, offer to work on a copy, and offer to describe the changes instead of making them
     - _Requirements: 11.1, 11.2, 11.7, 11.8_
@@ -367,7 +395,7 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
     - Test against real-world documents exercising the features `zavora-docx/WORKPLAN.md` lists as unimplemented — footnotes, hyperlinks, bookmarks, comments, watermarks, track changes, form fields, protection
     - Assert the probe warns and offers a copy rather than silently dropping content
     - **Validates: Requirement 11.7**
-  - [ ] 13.3 Implement the Presentation agent
+  - [x] 13.3 Implement the Presentation agent
     - Mount `mcp_slides`; load instructions from the existing `pptx` skill
     - Use `render_slide` for the live preview and `lint_design` plus contrast QA before presenting a deck as complete, stating any fix it made rather than applying it silently
     - _Requirements: 10.5, 10.8, 11.1_
@@ -399,14 +427,14 @@ Next: task 3.5 (the run pipeline, which now has every part it composes), then 9.
     - **Property 25: Render node stability** — for any Artefact rendered, edited and re-rendered, identifiers of unchanged nodes are unchanged
     - **Property 26: Render fidelity** — the rendered view contains every content node the document model contains
     - **Validates: Requirements 22.1, 22.2, 22.3, 22.6**
-  - [ ] 13.8 Implement the document editing client
+  - [x] 13.8 Implement the document editing client
     - Render from `zavora-docx-html::to_html_fragment` plus `css::generate_base_css`, mounted on the shared shell
     - Implement L1 direct editing: text entry and editing, inline and paragraph formatting, lists, tables, and comments, with selection driven by `data-node-id`
     - Implement change badges attributing Work_Studio's own edits with per-change reversal
     - Apply the fidelity guard: block any direct edit affecting content the engine cannot round-trip, with an explanation instead of a lossy write
     - _Requirements: 22.1, 22.2, 22.3, 22.6, 22.10, 22.11_
     - _Journey: J11_
-  - [ ] 13.9 Implement the presentation editing client
+  - [x] 13.9 Implement the presentation editing client
     - Render each slide from `zavora-slide-layout::to_svg` with a thumbnail strip, mounted on the shared shell
     - Implement L1 direct editing: select, move, resize and delete shapes; edit text in place; reorder and duplicate slides; apply theme colours — with hit-testing driven by `data-node-id`
     - Run `lint_design` and contrast QA on change and report any fix made rather than applying it silently
