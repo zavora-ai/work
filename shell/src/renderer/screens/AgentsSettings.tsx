@@ -46,6 +46,8 @@ const EFFECT_TONE: Record<Effect, { bg: string; fg: string }> = {
   acts: { bg: "var(--warn-bg)", fg: "var(--warn-fg)" },
 };
 
+import { AgentReach } from "./CapabilitiesPane.tsx";
+
 export function AgentsSettings() {
   const [openId, setOpenId] = useState<string | undefined>();
   const open = AGENTS.find((agent) => agent.id === openId);
@@ -91,6 +93,12 @@ export function AgentsSettings() {
             <Icon name="chevronRight" size={15} stroke="var(--faint)" />
           </button>
         ))}
+      </div>
+
+      {/* What each specialist has actually been given, read from the store rather than
+          listed here — so this cannot drift from what Settings changed. */}
+      <div style={{ marginTop: 22 }}>
+        <AgentReach />
       </div>
     </div>
   );

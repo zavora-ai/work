@@ -43,6 +43,18 @@ export interface StudioBridge {
    * Answers when the work is finished. Progress arrives on the event stream in the
    * meantime, because the work takes long enough that silence would read as a hang.
    */
+  /** What each specialist may reach, and whether it is on. */
+  capabilities(): Promise<unknown>;
+  addCapability(body: {
+    label: string;
+    command: string;
+    args?: string[];
+    env?: Record<string, string>;
+    agents?: string[];
+  }): Promise<unknown>;
+  /** Turn one on or off, remove it, or say which specialists may use it. */
+  capabilityAction(body: { id: string; action: string; agents?: string[] }): Promise<unknown>;
+
   /**
    * A change the User made by hand.
    *

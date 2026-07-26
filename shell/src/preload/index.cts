@@ -19,6 +19,16 @@ contextBridge.exposeInMainWorld("studio", {
   health: () => ipcRenderer.invoke("core:health"),
   events: (since: number) => ipcRenderer.invoke("core:events", since),
   openFile: () => ipcRenderer.invoke("shell:openFile"),
+  capabilities: () => ipcRenderer.invoke("core:capabilities"),
+  addCapability: (body: {
+    label: string;
+    command: string;
+    args?: string[];
+    env?: Record<string, string>;
+    agents?: string[];
+  }) => ipcRenderer.invoke("core:addCapability", body),
+  capabilityAction: (body: { id: string; action: string; agents?: string[] }) =>
+    ipcRenderer.invoke("core:capabilityAction", body),
   edit: (body: { path: string; sheet: string; cell: string; value: string; thread?: string }) =>
     ipcRenderer.invoke("core:edit", body),
   files: (within?: string) => ipcRenderer.invoke("core:files", within),

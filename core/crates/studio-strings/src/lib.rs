@@ -117,6 +117,31 @@ pub const CATALOGUE: &[Entry] = &[
     p("steer.new_placeholder", "Tell it something new…"),
     // ---- documents ----
     p("new.open_a_file", "Open a file"),
+    s("caps.title", "What each specialist can reach"),
+    s(
+        "caps.intro",
+        "Turn one off and nothing will use it. Give one to a specialist and it may use it for your work.",
+    ),
+    s("caps.none", "Nothing yet."),
+    s("caps.add_one", "Add one"),
+    s("caps.add", "Add"),
+    s("caps.remove", "Remove"),
+    s("caps.turn_on", "Turn on"),
+    s("caps.turn_off", "Turn off"),
+    s("caps.used_by", "Used by"),
+    s("caps.nobody", "nobody yet"),
+    s("caps.needs", "Needs:"),
+    s("caps.per_agent", "What each one has been given"),
+    s(
+        "caps.nothing_given",
+        "Nothing yet — it cannot do this kind of work.",
+    ),
+    s("caps.name_placeholder", "What is it called?"),
+    s("caps.command_placeholder", "What should Work Studio run?"),
+    s(
+        "caps.then_allocate",
+        "Once added, choose which specialists may use it.",
+    ),
     p(
         "steer.nothing_yet",
         "Nothing yet. Tell it how you like things done, or correct it and it will notice.",

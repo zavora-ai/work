@@ -15,6 +15,7 @@ import { useState } from "react";
 import { t } from "../../shared/strings.ts";
 import { GLOBAL_NOTES } from "../fixtures.ts";
 import { AgentsSettings } from "./AgentsSettings.tsx";
+import { CapabilitiesPane } from "./CapabilitiesPane.tsx";
 import { Accounts, Files, Spending } from "./SettingsPanes.tsx";
 import { Button, Field, Icon, Segmented, Toggle } from "../components/primitives.tsx";
 
@@ -22,6 +23,7 @@ const TABS = [
   t("settings.tab.general"),
   t("settings.tab.how_i_work"),
   t("settings.tab.agents"),
+  t("caps.title"),
   t("settings.tab.accounts"),
   t("settings.tab.files"),
   t("settings.tab.spending"),
@@ -69,7 +71,9 @@ export function Settings({
         })}
       </div>
 
-      {tab === t("settings.tab.how_i_work") ? (
+      {tab === t("caps.title") ? (
+        <CapabilitiesPane />
+      ) : tab === t("settings.tab.how_i_work") ? (
         <HowIShouldWork />
       ) : tab === t("settings.tab.agents") ? (
         <AgentsSettings />

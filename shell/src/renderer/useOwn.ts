@@ -109,6 +109,69 @@ export function useThreads(changedAt?: number) {
   return { threads, reload };
 }
 
+/* -------------------------------------------------------- what it can reach */
+
+export interface Capability {
+  id: string;
+  label: string;
+  /** "ready", "missing" or "off". */
+  readiness: string;
+  /** How that reads, in the User's words. */
+  status: string;
+  /** Which specialists may use it. */
+  agents: string[];
+  /** Names of the settings it needs. Never values. */
+  needs: string[];
+  /** True for what came with Work Studio, which may be turned off but not removed. */
+  builtIn: boolean;
+}
+
+export function useCapabilities() {
+  const [items, setItems] = useState<Capability[]>([]);
+  const [problem, setProblem] = useState<string | undefined>();
+
+  const reload = useCallback(async () => {
+    try {
+      const answer = (await bridge()?.capabilities?.()) as
+        | { capabilities?: Capability[]; problem?: string }
+        | undefined;
+      setItems(answer?.capabilities ?? []);
+      setProblem(answer?.problem);
+    } catch {
+      setItems([]);
+      setProblem("Work Studio could not read what it can reach.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const act = useCallback(
+    async (id: string, action: "on" | "off" | "remove" | "allocate", agents?: string[]) => {
+      const answer = (await bridge()?.capabilityAction?.({ id, action, agents })) as
+        | { problem?: string }
+        | undefined;
+      if (answer?.problem) setProblem(answer.problem);
+      await reload();
+    },
+    [reload],
+  );
+
+  const add = useCallback(
+    async (label: string, command: string, agents: string[]) => {
+      const answer = (await bridge()?.addCapability?.({ label, command, agents })) as
+        | { problem?: string }
+        | undefined;
+      if (answer?.problem) setProblem(answer.problem);
+      await reload();
+    },
+    [reload],
+  );
+
+  return { items, problem, reload, act, add };
+}
+
 /* ---------------------------------------------------------------- steering */
 
 export interface Note {

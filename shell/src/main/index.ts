@@ -150,6 +150,12 @@ app.whenReady().then(async () => {
     return result.filePaths[0];
   });
 
+  ipcMain.handle("core:capabilities", () => coreFetch("/capabilities"));
+  ipcMain.handle("core:addCapability", (_e, body: unknown) => corePost("/capabilities", body));
+  ipcMain.handle("core:capabilityAction", (_e, body: unknown) =>
+    corePost("/capabilities/act", body),
+  );
+
   ipcMain.handle("core:edit", (_event, body: unknown) => corePost("/edit", body));
 
   ipcMain.handle("core:files", (_event, within: unknown) =>
