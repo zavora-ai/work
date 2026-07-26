@@ -279,6 +279,9 @@ pub fn router(api: Arc<Api>) -> Router {
         .route("/thread", get(thread))
         // The User's own edit. Same path as an agent's, which is the point.
         .route("/edit", axum::routing::post(edit))
+        // What each specialist may reach, and which of those are on.
+        .route("/capabilities", get(capabilities).post(add_capability))
+        .route("/capabilities/act", axum::routing::post(act_on_capability))
         .with_state(api)
 }
 
@@ -489,7 +492,7 @@ async fn edit(
         Ok(()) => {
             if let Some(keeper) = api.keeper.as_ref() {
                 keeper.log(
-                    "artefact",
+                    "action",
                     &format!("you changed {} on {}", body.cell, body.sheet),
                 );
                 if let Some(thread) = body.thread.as_deref() {
@@ -553,6 +556,65 @@ async fn thread(
     }
 }
 
+/// What each specialist may reach. Settings shows this.
+async fn capabilities(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match api.keeper.as_ref().map(|k| k.capabilities()) {
+        Some(Ok(list)) => Json(serde_json::json!({ "capabilities": list })).into_response(),
+        Some(Err(detail)) => problem(
+            "Work Studio could not read what it can reach".into(),
+            Some(&detail),
+        ),
+        None => Json(serde_json::json!({ "capabilities": [] })).into_response(),
+    }
+}
+
+async fn add_capability(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<crate::capabilities::NewCapability>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(keeper) = api.keeper.as_ref() else {
+        return problem("Work Studio is not keeping anything yet".into(), None);
+    };
+    match keeper.add_capability(&body) {
+        Ok(()) => Json(serde_json::json!({ "done": true })).into_response(),
+        Err(detail) => problem(detail, None),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CapabilityAction {
+    pub id: String,
+    /// One of: on, off, remove, allocate.
+    pub action: String,
+    /// For `allocate`: exactly the specialists that may use it.
+    #[serde(default)]
+    pub agents: Vec<String>,
+}
+
+async fn act_on_capability(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<CapabilityAction>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(keeper) = api.keeper.as_ref() else {
+        return problem("Work Studio is not keeping anything yet".into(), None);
+    };
+    match keeper.act_on_capability(&body.id, &body.action, &body.agents) {
+        Ok(()) => Json(serde_json::json!({ "done": true })).into_response(),
+        Err(detail) => problem(detail, None),
+    }
+}
+
 /// A problem in the User's words, with the cause kept for support only.
 fn problem(message: String, detail: Option<&str>) -> axum::response::Response {
     if let Some(detail) = detail {
@@ -606,8 +668,23 @@ async fn ask(
         }
     };
 
-    // The piece of work exists before anything is said about it, so a note has something
-    // to belong to and the User can find it again.
+    // Read what was said before recording this turn, or the question just asked would be
+    // handed back as something said earlier.
+    // The renderer does not supply this; the Core knows it.
+    let history: Vec<studio_runner::pipeline::Said> = api
+        .keeper
+        .as_ref()
+        .and_then(|keeper| keeper.turns(&thread).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .map(|turn| studio_runner::pipeline::Said {
+            from_user: turn.from == "you",
+            text: turn.text,
+        })
+        .collect();
+
+    // The piece of work exists before anything is said about it, so a note has something to
+    // belong to and the User can find it again.
     if let Some(keeper) = api.keeper.as_ref() {
         let _ = keeper.ensure_thread(&thread, &asked.asked, Some(&asked.path));
         let _ = keeper.remember_turn(&thread, "you", &asked.asked);
@@ -620,6 +697,7 @@ async fn ask(
         // a run is always something the User can see and edit.
         steering: api.steering_for(&thread).await,
         thread: thread.clone(),
+        history,
     };
 
     // Progress is published as it arrives. `publish` is async and the reporter is not, so
@@ -652,7 +730,7 @@ async fn ask(
             let _ = keeper.remember_turn(&thread, "studio", &outcome.said);
         }
         keeper.log(
-            "artefact",
+            "action",
             &format!(
                 "asked about {}: {} operations, {} refused",
                 asked.path,

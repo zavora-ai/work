@@ -13,6 +13,9 @@ pub mod edits;
 pub mod lease;
 
 /// Talking to a capability server. Needs the Capability_Layer beside us.
+/// Remembering what the User has told Work Studio.
+#[cfg(feature = "adk")]
+pub mod memory;
 /// Doing the work: model, specialist, gate, file.
 #[cfg(feature = "adk")]
 pub mod pipeline;

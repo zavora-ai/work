@@ -346,11 +346,97 @@ impl Keeper {
             .unwrap_or_default()
     }
 
+    /// What each specialist may reach.
+    pub fn capabilities(&self) -> Result<Vec<crate::capabilities::CapabilityView>, String> {
+        let store = self.store.lock().map_err(|_| "the store was left locked")?;
+        crate::capabilities::Capabilities::new(&store).list()
+    }
+
+    /// Add a connection the User has described.
+    pub fn add_capability(&self, new: &crate::capabilities::NewCapability) -> Result<(), String> {
+        let store = self.store.lock().map_err(|_| "the store was left locked")?;
+        let id = new
+            .label
+            .to_lowercase()
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+            .collect::<String>();
+        crate::capabilities::Capabilities::new(&store).add(&id, new, false)
+    }
+
+    /// Turn one on or off, remove it, or say which specialists may use it.
+    pub fn act_on_capability(
+        &self,
+        id: &str,
+        action: &str,
+        agents: &[String],
+    ) -> Result<(), String> {
+        let store = self.store.lock().map_err(|_| "the store was left locked")?;
+        let capabilities = crate::capabilities::Capabilities::new(&store);
+        match action {
+            "on" => capabilities.set_enabled(id, true),
+            "off" => capabilities.set_enabled(id, false),
+            "remove" => capabilities.remove(id),
+            "allocate" => capabilities.allocate(id, agents),
+            other => Err(format!("no such action: {other}")),
+        }
+    }
+
+    /// Provision what came with Work Studio, so Settings has something true to show.
+    ///
+    /// Written once. A connection the User has since turned off stays off, because the
+    /// insert leaves `enabled` alone on conflict.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn provision(&self, siblings: &std::path::Path) -> Result<(), String> {
+        let store = self.store.lock().map_err(|_| "the store was left locked")?;
+        let capabilities = crate::capabilities::Capabilities::new(&store);
+        for (id, label, relative, agent) in [
+            (
+                "spreadsheets",
+                "Spreadsheets",
+                "mcp-servers/worksheet-mcp/target/debug/excel-mcp-server",
+                "spreadsheet",
+            ),
+            (
+                "documents",
+                "Documents",
+                "mcp-servers/docx-mcp/target/debug/docx-mcp-server",
+                "document",
+            ),
+            (
+                "presentations",
+                "Presentations",
+                "mcp-servers/mcp_slides/target/debug/slides-mcp-server",
+                "presentation",
+            ),
+        ] {
+            let command = siblings.join(relative);
+            capabilities.add(
+                id,
+                &crate::capabilities::NewCapability {
+                    label: label.to_string(),
+                    command: command.to_string_lossy().into_owned(),
+                    args: Vec::new(),
+                    env: Default::default(),
+                    agents: vec![agent.to_string()],
+                },
+                true,
+            )?;
+        }
+        Ok(())
+    }
+
     /// Record that something happened, for the diagnostics view.
+    ///
+    /// A rejected write is reported rather than swallowed. It was swallowed, and so a
+    /// category the schema does not allow — the Activity_Log constrains them to a fixed
+    /// list — failed silently for every entry the product tried to write.
     #[cfg_attr(not(feature = "adk"), allow(dead_code))]
     pub fn log(&self, category: &str, detail: &str) {
-        if let Ok(store) = self.store.lock() {
-            let _ = store.log(category, detail, None, None);
+        if let Ok(store) = self.store.lock()
+            && let Err(error) = store.log(category, detail, None, None)
+        {
+            eprintln!("[core] this was not recorded in the activity log: {error}");
         }
     }
 }
@@ -373,6 +459,47 @@ pub fn new_id(prefix: &str) -> String {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     format!("{prefix}-{now:x}")
+}
+
+/// What each specialist has been allowed to reach.
+///
+/// Reading it here rather than caching it means a change in Settings takes effect on the next
+/// piece of work, not on the next restart.
+#[cfg(feature = "adk")]
+impl studio_runner::pipeline::Provides for Keeper {
+    fn for_agent(&self, agent: &str) -> Vec<studio_runner::pipeline::Allocated> {
+        let Ok(store) = self.store.lock() else {
+            return Vec::new();
+        };
+        crate::capabilities::Capabilities::new(&store)
+            .for_agent(agent)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|resolved| studio_runner::pipeline::Allocated {
+                label: resolved.label,
+                command: resolved.command,
+                args: resolved.args,
+                env: resolved.env,
+            })
+            .collect()
+    }
+}
+
+/// What the specialist may remember, and how.
+///
+/// The same door the User's own typing goes through, so the list headed *What I've learned
+/// from you* holds both and there is one place to look.
+#[cfg(feature = "adk")]
+impl studio_runner::memory::Remembers for Keeper {
+    fn remember(&self, thread: &str, note: &str) -> Result<String, String> {
+        let kept = self.add_note(Some(thread), note)?;
+        self.log("action", &format!("remembered: {note}"));
+        Ok(kept.provenance)
+    }
+
+    fn recall(&self, thread: &str) -> Vec<String> {
+        self.notes_for_run(thread, None)
+    }
 }
 
 #[cfg(test)]

@@ -21,6 +21,10 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         "0002_thread_turns",
         include_str!("../migrations/0002_thread_turns.sql"),
     ),
+    (
+        "0003_capabilities",
+        include_str!("../migrations/0003_capabilities.sql"),
+    ),
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -159,7 +163,7 @@ mod tests {
     #[test]
     fn migration_applies_and_is_idempotent() {
         let mut s = store();
-        let expected = vec!["0001_init", "0002_thread_turns"];
+        let expected = vec!["0001_init", "0002_thread_turns", "0003_capabilities"];
         assert_eq!(s.applied_migrations().unwrap(), expected);
         s.migrate().expect("re-running migrations is a no-op");
         assert_eq!(
@@ -183,6 +187,8 @@ mod tests {
             "job_runs",
             "jobs",
             "spend_ledger",
+            "capabilities",
+            "capability_agents",
             "steering_notes",
             "thread_turns",
             "tray_items",

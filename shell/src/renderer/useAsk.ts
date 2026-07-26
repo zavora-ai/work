@@ -30,6 +30,14 @@ export interface AskState {
   refused: string[];
   /** Bumped whenever the file on disk changed, so a view can reload. */
   changedAt: number;
+  /**
+   * Bumped after every exchange, whether or not the file changed.
+   *
+   * The notes panel needs this rather than `changedAt`: being told a preference changes no
+   * file, so a panel keyed on the file reloaded never and sat empty saying "nothing yet"
+   * while the note it had just been given was already in the store.
+   */
+  answeredAt: number;
 }
 
 interface Answer {
@@ -57,6 +65,7 @@ export function useAsk(path: string | undefined, thread: string) {
     working: false,
     refused: [],
     changedAt: 0,
+    answeredAt: 0,
   });
   // The resume point, so each poll asks only for what it has not seen.
   const since = useRef(0);
@@ -154,6 +163,7 @@ export function useAsk(path: string | undefined, thread: string) {
           // Only bumped when the file really changed, so a view does not reload for
           // an answer that changed nothing.
           changedAt: answer.changed ? Date.now() : s.changedAt,
+          answeredAt: Date.now(),
         }));
       } catch {
         setState((s) => ({

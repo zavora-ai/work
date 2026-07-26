@@ -179,9 +179,10 @@ function DocumentDetails(props: {
 export function SpreadsheetWorkspace(props: WorkspaceProps & { path?: string; thread?: string }) {
   const conversation = useAsk(props.path, props.thread ?? "spreadsheet");
   // What Work Studio goes on, refetched after every change so an accepted note shows at once.
+  // Keyed on every exchange, not just a file change: being told a preference changes no file.
   const steering = useSteering(
     props.thread ?? "spreadsheet",
-    conversation.state.changedAt,
+    conversation.state.answeredAt,
   );
   // Bumped when the User changes a cell themselves.
   const [editedAt, setEditedAt] = useState(0);

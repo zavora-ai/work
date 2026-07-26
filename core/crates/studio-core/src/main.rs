@@ -8,6 +8,7 @@
 //! loopback API arrives with task 1.5 and the ADK-Rust runner with task 3.5.
 
 mod api;
+mod capabilities;
 mod keeper;
 
 use studio_jobs::{Job, JobKind, JobState};
@@ -55,21 +56,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // when asked, rather than failing to start.
     #[cfg(feature = "adk")]
     let state = {
+        // The store comes first: the specialist remembers through it, so an Engine built
+        // without it would tell the User it had remembered something and write nothing.
+        let kept = keeper::Keeper::open(std::path::Path::new(&dir));
+        if let Err(detail) = &kept {
+            eprintln!("[core] nothing will be kept this session: {detail}");
+        }
+
         let siblings = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../..");
         let servers = studio_runner::pipeline::ServerBinaries::from_siblings(&siblings);
-        let engine = std::sync::Arc::new(studio_runner::pipeline::Engine::new(
-            studio_router::Policy::openai_default(),
-            servers,
-        ));
-        let api = api::Api::with_engine(&token, engine);
-        match keeper::Keeper::open(std::path::Path::new(&dir)) {
-            Ok(keeper) => api.with_keeper(keeper),
-            Err(detail) => {
-                // The store is where the User's work is kept, so failing to open it is
-                // worth saying loudly — but it must not stop them reading a file.
-                eprintln!("[core] nothing will be kept this session: {detail}");
-                api
+        let mut engine =
+            studio_runner::pipeline::Engine::new(studio_router::Policy::openai_default(), servers);
+        if let Ok(keeper) = &kept {
+            engine = engine
+                .remembering(std::sync::Arc::clone(keeper) as std::sync::Arc<_>)
+                .providing(std::sync::Arc::clone(keeper) as std::sync::Arc<_>);
+            // So Settings shows what is really there rather than an empty list.
+            if let Err(detail) = keeper.provision(&siblings) {
+                eprintln!("[core] could not record what came with Work Studio: {detail}");
             }
+        }
+
+        let api = api::Api::with_engine(&token, std::sync::Arc::new(engine));
+        match kept {
+            Ok(keeper) => api.with_keeper(keeper),
+            Err(_) => api,
         }
     };
     #[cfg(not(feature = "adk"))]

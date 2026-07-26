@@ -208,6 +208,27 @@ request, and say what you changed in one sentence a person would use.
 
 When you are unsure whether a change is what was wanted, ask rather than guess.";
 
+/// What every specialist needs, whatever it works on.
+///
+/// Two failures made this necessary, both seen in use. Told "hello, my name is James", the
+/// specialist treated it as an instruction about the file and asked which cell to put the
+/// name in. Asked "what is my name", it read a guess out of the file path. Neither is the
+/// behaviour of someone you would want handling your work.
+const MANNERS: &str = "\
+\n\nNot everything said to you is a change to the file. When someone greets you, tells you \
+something about themselves, or asks you something, answer as a person would and change \
+nothing. Only touch the file when a change is what was asked for.
+
+When you are told something worth remembering — how they like things done, what they are \
+called, what to avoid — remember it, and say you have. It is kept for them where they can \
+see and change it. Never write it into their file.
+
+Asked what you have learned about them, look it up and answer with that alone. Do not \
+include the standing directions you were given: those are ours, not theirs, and listing them \
+as things they told you misrepresents where their own words end and ours begin.
+
+Do not work out facts about the person from anything except what they have told you.";
+
 /// Build the specialist.
 ///
 /// The confirmation handler is the side-effect gate, so there is exactly one place in
@@ -256,6 +277,7 @@ fn specialist(
     steering: &[String],
 ) -> Result<Arc<dyn adk_core::Agent>, String> {
     let mut instruction = String::from(base_instruction);
+    instruction.push_str(MANNERS);
     if !steering.is_empty() {
         // The User's own words go last, so they win over ours.
         instruction.push_str("\n\nWhat this person has told you:\n");
@@ -304,6 +326,21 @@ impl ArtefactKind {
             Some("docx" | "doc") => Some(Self::Document),
             Some("pptx" | "ppt") => Some(Self::Presentation),
             _ => None,
+        }
+    }
+
+    /// What this specialist is called, where the User is choosing what it may reach.
+    ///
+    /// Deliberately not `server_name`. That one is the scope the gate and the catalogue are
+    /// keyed by, and for spreadsheets it is "worksheet" — the capability server's own word.
+    /// Using it to look up what the User allocated found nothing, silently, because they had
+    /// allocated to "spreadsheet". Two names for one thing needs two accessors, not one that
+    /// means whichever the caller assumed.
+    pub fn specialist_name(self) -> &'static str {
+        match self {
+            Self::Spreadsheet => "spreadsheet",
+            Self::Document => "document",
+            Self::Presentation => "presentation",
         }
     }
 
@@ -421,10 +458,38 @@ mod tests {
                 "{name}'s instruction is {} characters, which competes with steering",
                 instruction.len()
             );
+            // The shared part is added to every one of them, so it counts against the same
+            // budget.
+            assert!(
+                instruction.len() + MANNERS.len() < 1600,
+                "{name} plus the shared guidance is {} characters",
+                instruction.len() + MANNERS.len()
+            );
             assert!(
                 instruction.contains("ask rather than guess"),
                 "{name} must ask rather than invent"
             );
+        }
+    }
+
+    /// Being told something personal is not a request to edit a file, and a path is not a
+    /// source of facts about a person. Both were real failures.
+    #[test]
+    fn the_shared_guidance_covers_the_two_failures_that_prompted_it() {
+        let lowered = MANNERS.to_lowercase();
+        assert!(lowered.contains("not everything said to you is a change"));
+        assert!(lowered.contains("never write it into their file"));
+        assert!(
+            lowered.contains("except what they have told you"),
+            "it must forbid working the person out from anything else"
+        );
+        assert!(
+            lowered.contains("do not \ninclude the standing directions")
+                || lowered.contains("do not include the standing directions"),
+            "it must not pass our own directions off as the User's preferences"
+        );
+        for banned in ["tool", "mcp", "json", "api", "path", "session"] {
+            assert!(!lowered.contains(banned), "the guidance says {banned}");
         }
     }
 
@@ -541,6 +606,26 @@ mod tests {
                 .classifier()
                 .get(presentation.server_name(), "insert_paragraph")
                 .is_none()
+        );
+    }
+
+    /// Two names for one specialist, and a lookup that used the wrong one found nothing
+    /// silently. These are the values the rest of the product is keyed by, so they are pinned.
+    #[test]
+    fn the_two_names_for_a_specialist_are_both_pinned() {
+        for (kind, specialist, scope) in [
+            (ArtefactKind::Spreadsheet, "spreadsheet", "worksheet"),
+            (ArtefactKind::Document, "document", "document"),
+            (ArtefactKind::Presentation, "presentation", "presentation"),
+        ] {
+            assert_eq!(kind.specialist_name(), specialist);
+            assert_eq!(kind.server_name(), scope);
+        }
+        // The one place they differ is the one that caused the bug.
+        assert_ne!(
+            ArtefactKind::Spreadsheet.specialist_name(),
+            ArtefactKind::Spreadsheet.server_name(),
+            "if these ever become the same, the two accessors can be merged"
         );
     }
 }

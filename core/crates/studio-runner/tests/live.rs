@@ -74,6 +74,7 @@ async fn the_user_asks_for_a_change_and_the_file_changes() {
             artefact: path.clone(),
             steering: vec!["Keep figures as formulas so I can see the working.".to_string()],
             thread: "live-test-session".to_string(),
+            history: Vec::new(),
         })
         .await
         .expect("the work should be done");
@@ -137,6 +138,7 @@ async fn without_a_credential_nothing_is_attempted() {
             artefact: path.clone(),
             steering: Vec::new(),
             thread: "no-credential".to_string(),
+            history: Vec::new(),
         })
         .await;
 
@@ -160,5 +162,82 @@ async fn without_a_credential_nothing_is_attempted() {
     if let Some(key) = previous {
         unsafe { std::env::set_var("OPENAI_API_KEY", key) };
     }
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+/// The failure a User reported: told their name, then asked for it, and the specialist read a
+/// guess out of the file path instead of remembering. Every request had been starting a new
+/// conversation.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs a credential and spends money"]
+async fn it_remembers_what_was_said_a_moment_ago() {
+    if !have_credential() {
+        eprintln!("skipping: no credential in the environment");
+        return;
+    }
+    let servers = ServerBinaries::from_siblings(&siblings());
+    if servers.spreadsheet.is_none() {
+        eprintln!("skipping: the spreadsheet server is not built");
+        return;
+    }
+
+    let path = temp("conversation.xlsx");
+    {
+        let mut workbook = zavora_xlsx::Workbook::new();
+        let sheet = workbook.worksheet(0).unwrap();
+        sheet.set_name("Summary").unwrap();
+        sheet.write(0, 0, "Month").unwrap();
+        sheet.write(1, 0, "July").unwrap();
+        workbook.save(&path).unwrap();
+    }
+
+    let engine = Engine::new(Policy::openai_default(), servers);
+    let thread = "remembering".to_string();
+
+    let first = engine
+        .run(&Request {
+            asked: "Hello. My name is James Maina.".to_string(),
+            artefact: path.clone(),
+            steering: Vec::new(),
+            thread: thread.clone(),
+            history: Vec::new(),
+        })
+        .await
+        .expect("the greeting should be answered");
+    eprintln!("first:  {}", first.said);
+
+    // A greeting is not a change request.
+    assert!(
+        !first.saved,
+        "being greeted must not change the User's file: {first:?}"
+    );
+
+    let second = engine
+        .run(&Request {
+            asked: "What is my name?".to_string(),
+            artefact: path.clone(),
+            steering: Vec::new(),
+            thread: thread.clone(),
+            history: Vec::new(),
+        })
+        .await
+        .expect("the question should be answered");
+    eprintln!("second: {}", second.said);
+
+    assert!(
+        second.said.contains("Maina"),
+        "it must remember what it was told a moment ago, got: {}",
+        second.said
+    );
+    assert!(
+        !second.said.contains("jameskaranja") && !second.said.contains("/Users/"),
+        "it must not read the person out of a path: {}",
+        second.said
+    );
+    assert!(
+        !second.saved,
+        "answering a question must not change the file"
+    );
+
     let _ = std::fs::remove_dir_all(path.parent().unwrap());
 }

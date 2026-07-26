@@ -69,6 +69,16 @@ pub struct Request {
     pub steering: Vec<String>,
     /// Which thread this belongs to, so the conversation continues rather than restarting.
     pub thread: String,
+    /// What was already said in this piece of work, oldest first.
+    #[allow(clippy::struct_field_names)]
+    pub history: Vec<Said>,
+}
+
+/// One thing that was said.
+#[derive(Debug, Clone)]
+pub struct Said {
+    pub from_user: bool,
+    pub text: String,
 }
 
 /// What Work Studio is doing, while it does it.
@@ -114,6 +124,39 @@ pub struct Engine {
     policy: Policy,
     /// Where each specialist's capability server lives.
     servers: ServerBinaries,
+    /// One conversation store for the Engine's whole life.
+    ///
+    /// This was created fresh for every request, which meant each thing the User said began
+    /// a new conversation: they could say their name and be asked for it again in the next
+    /// breath. A conversation is a conversation.
+    sessions: Arc<dyn adk_session::SessionService>,
+    /// Threads whose earlier turns have already been given back to the model, so a restart
+    /// is caught up exactly once rather than on every message.
+    caught_up: std::sync::Mutex<std::collections::BTreeSet<String>>,
+    /// Where what the User has told Work Studio is kept. Absent means the specialist has no
+    /// way to remember, and it is told so rather than left to promise otherwise.
+    remembers: Option<Arc<dyn crate::memory::Remembers>>,
+    /// What the User has allowed each specialist to reach. Absent falls back to the
+    /// connections provisioned beside the app.
+    provides: Option<Arc<dyn Provides>>,
+}
+
+/// One connection a specialist may use, as the Core resolved it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Allocated {
+    pub label: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub env: std::collections::BTreeMap<String, String>,
+}
+
+/// What a specialist has been allocated.
+///
+/// A trait so the runner does not depend on the store. Without one, the specialists fall back
+/// to the connections provisioned beside the app — which is what happens before the User has
+/// been near Settings.
+pub trait Provides: Send + Sync {
+    fn for_agent(&self, agent: &str) -> Vec<Allocated>;
 }
 
 /// The binaries the specialists need. Provisioned beside the app in a release.
@@ -145,6 +188,17 @@ impl ServerBinaries {
             ArtefactKind::Presentation => self.presentation.as_deref(),
         }
     }
+}
+
+/// The file's own name.
+///
+/// The full path is what the tools need, not what the conversation needs. Handing over the
+/// path invited exactly the wrong kind of inference: asked for their name, the specialist
+/// read it out of `/Users/...` and offered it back as a guess about the person.
+fn file_name(path: &std::path::Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| String::from("this file"))
 }
 
 /// Where the content actually is, in terms the specialist can act on.
@@ -259,7 +313,26 @@ fn find_handle(answer: &str) -> Option<String> {
 
 impl Engine {
     pub fn new(policy: Policy, servers: ServerBinaries) -> Self {
-        Self { policy, servers }
+        Self {
+            policy,
+            servers,
+            sessions: Arc::new(adk_session::InMemorySessionService::new()),
+            caught_up: std::sync::Mutex::new(std::collections::BTreeSet::new()),
+            remembers: None,
+            provides: None,
+        }
+    }
+
+    /// The same, honouring what the User has allowed in Settings.
+    pub fn providing(mut self, provides: Arc<dyn Provides>) -> Self {
+        self.provides = Some(provides);
+        self
+    }
+
+    /// The same, able to remember.
+    pub fn remembering(mut self, remembers: Arc<dyn crate::memory::Remembers>) -> Self {
+        self.remembers = Some(remembers);
+        self
     }
 
     /// Which model this work will use.
@@ -367,12 +440,34 @@ impl Engine {
         mut report: impl FnMut(&str),
     ) -> Result<Outcome, RunError> {
         let kind = ArtefactKind::of(&request.artefact).ok_or(RunError::UnknownKind)?;
-        let binary = self
-            .servers
-            .for_kind(kind)
-            .ok_or_else(|| RunError::ServerUnavailable {
-                detail: format!("no server provisioned for {kind:?}"),
-            })?;
+
+        // What the User has allowed this specialist, if they have said. A connection they
+        // turned off is simply not here, so turning one off in Settings takes it away rather
+        // than being recorded and ignored.
+        let allocated = self
+            .provides
+            .as_ref()
+            .map(|provides| provides.for_agent(kind.specialist_name()))
+            .unwrap_or_default();
+
+        let binary: std::path::PathBuf = match allocated.first() {
+            Some(first) => std::path::PathBuf::from(&first.command),
+            None if self.provides.is_some() => {
+                return Err(RunError::ServerUnavailable {
+                    detail: format!(
+                        "the {} specialist has not been allowed anything it can use",
+                        kind.specialist_name()
+                    ),
+                });
+            }
+            None => self
+                .servers
+                .for_kind(kind)
+                .ok_or_else(|| RunError::ServerUnavailable {
+                    detail: format!("no connection provisioned for {kind:?}"),
+                })?
+                .to_path_buf(),
+        };
 
         let reference = self.model_reference().ok_or(RunError::NoModel)?;
         let model = model_for(reference)?;
@@ -409,28 +504,50 @@ impl Engine {
         // The toolset the specialist is given. `Server` owns it, so it is shared rather
         // than moved: the pipeline still needs the server to answer for its operations.
         let toolset: Arc<dyn adk_core::Toolset> = server.clone().toolset_for_agent();
+        let mut toolsets = vec![toolset];
+
+        // Remembering is a thing the specialist does, not a thing it claims. Without this it
+        // would say "I'll remember that" and write nothing anywhere.
+        if let Some(remembers) = self.remembers.as_ref() {
+            toolsets.push(Arc::new(crate::memory::MemoryTools::new(
+                request.thread.clone(),
+                Arc::clone(remembers),
+            )) as Arc<dyn adk_core::Toolset>);
+        }
+
         let agent = kind
-            .agent(model, vec![toolset], &request.steering)
+            .agent(model, toolsets, &request.steering)
             .map_err(|detail| RunError::Failed { detail })?;
 
-        let session_service: Arc<dyn adk_session::SessionService> =
-            Arc::new(adk_session::InMemorySessionService::new());
-
-        // A thread is a continuing conversation, so the session is created under the
-        // thread's own name and reused. Without this the runtime has nothing to append to
-        // and the first message fails.
-        let _ = session_service
-            .create(adk_session::CreateRequest {
+        // A thread is a continuing conversation, so it is created once and then reused.
+        //
+        // Creating it is not harmless: `create` stores a session with no events, so calling
+        // it on every request wiped the conversation each time. That is why someone could
+        // give their name and be asked for it again in the next breath.
+        let session_service = Arc::clone(&self.sessions);
+        let existing = session_service
+            .get(adk_session::GetRequest {
                 app_name: "work-studio".to_string(),
                 user_id: "the-user".to_string(),
-                session_id: Some(request.thread.clone()),
-                state: Default::default(),
+                session_id: request.thread.clone(),
+                num_recent_events: None,
+                after: None,
             })
             .await;
+        if existing.is_err() {
+            let _ = session_service
+                .create(adk_session::CreateRequest {
+                    app_name: "work-studio".to_string(),
+                    user_id: "the-user".to_string(),
+                    session_id: Some(request.thread.clone()),
+                    state: Default::default(),
+                })
+                .await;
+        }
         let runner = adk_runner::Runner::builder()
             .app_name("work-studio")
             .agent(agent)
-            .session_service(session_service.clone())
+            .session_service(session_service)
             .run_config(
                 adk_core::RunConfig::builder()
                     .tool_confirmation_handler(
@@ -448,8 +565,35 @@ impl Engine {
         // What is actually in the file, so the specialist does not have to guess. It guessed
         // wrong in a way worth preventing: it assumed the table started at row 1 when it
         // started at row 5, and wrote a column of formulas against empty cells.
+        // What was said before, given back once after a restart. Within one run of the
+        // application the conversation store already holds it.
+        let earlier = {
+            let mut caught_up = self
+                .caught_up
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            if caught_up.insert(request.thread.clone()) && !request.history.is_empty() {
+                let mut said = String::from("Earlier in this conversation:\n");
+                for turn in &request.history {
+                    let who = if turn.from_user {
+                        "They said"
+                    } else {
+                        "You said"
+                    };
+                    said.push_str(&format!("- {who}: {}\n", turn.text));
+                }
+                said
+            } else {
+                String::new()
+            }
+        };
+
         let opening = format!(
-            "The file open is {}.\n{}\n\n{}",
+            "{}The file open is called {}. Open it at exactly this path: {}\n\
+             That path is only how to reach the file. It says nothing about the person you \
+             are working with, so do not read anything from it.\n{}\n\n{}",
+            earlier,
+            file_name(&request.artefact),
             request.artefact.display(),
             describe_artefact(&request.artefact),
             request.asked
