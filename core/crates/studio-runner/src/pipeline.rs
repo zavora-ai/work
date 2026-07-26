@@ -141,6 +141,12 @@ pub enum SheetAction {
     Merge { range: String },
     /// Widen the columns to fit what is in them.
     FitColumns,
+    /// Add a sheet.
+    AddSheet { name: String },
+    /// Rename this sheet.
+    RenameSheet { to: String },
+    /// Remove this sheet, and everything on it.
+    DeleteSheet,
     /// Draw a chart of a range, placed at a cell.
     Chart {
         /// `column`, `bar`, `line`, `pie` or `area`.
@@ -163,6 +169,9 @@ impl SheetAction {
             Self::Freeze { .. } | Self::Unfreeze => "freeze_panes",
             Self::Merge { .. } => "merge_cells",
             Self::FitColumns => "autofit_columns",
+            Self::AddSheet { .. } => "add_sheet",
+            Self::RenameSheet { .. } => "rename_sheet",
+            Self::DeleteSheet => "delete_sheet",
             Self::Chart { .. } => "add_chart",
         }
     }
@@ -208,6 +217,13 @@ impl SheetAction {
             Self::Unfreeze => serde_json::json!({ "sheet_name": sheet, "cell": "A1" }),
             Self::Merge { range } => serde_json::json!({ "sheet_name": sheet, "range": range }),
             Self::FitColumns => serde_json::json!({ "sheet_name": sheet }),
+            // The new sheet's name, not the one in front — this is the only action where
+            // `sheet_name` means the thing being made rather than the thing being changed.
+            Self::AddSheet { name } => serde_json::json!({ "sheet_name": name }),
+            Self::RenameSheet { to } => {
+                serde_json::json!({ "current_name": sheet, "new_name": to })
+            }
+            Self::DeleteSheet => serde_json::json!({ "sheet_name": sheet }),
             Self::Chart {
                 kind,
                 range,
@@ -262,6 +278,9 @@ impl SheetAction {
             Self::Unfreeze => "you unfroze the headings".to_string(),
             Self::Merge { range } => format!("you merged {range}"),
             Self::FitColumns => "you fitted the columns".to_string(),
+            Self::AddSheet { name } => format!("you added a sheet called {name}"),
+            Self::RenameSheet { to } => format!("you renamed a sheet to {to}"),
+            Self::DeleteSheet => "you deleted a sheet".to_string(),
             Self::Chart { kind, range, .. } => format!("you added a {kind} chart of {range}"),
         }
     }

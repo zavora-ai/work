@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { cellRef, columnName, type Cell, type GridModel, type Sheet } from "../../shared/grid.ts";
 import { ChartView } from "./ChartView.tsx";
+import { t } from "../../shared/strings.ts";
 import { Field } from "./primitives.tsx";
 
 /// Whether the User was working in the grid when it was last taken down.
@@ -60,6 +61,7 @@ export function SheetGrid({
   onEditMany,
   onSelection,
   onUndo,
+  onSheets,
 }: {
   model: GridModel;
   /** A short aside for the sheet strip, where there is room for it. */
@@ -88,6 +90,8 @@ export function SheetGrid({
   }) => void;
   /** Put the last change back. Absent where the file cannot be written. */
   onUndo?: () => void;
+  /** Add, rename or remove a sheet. Absent where the file cannot be written. */
+  onSheets?: (what: "add sheet" | "rename sheet" | "delete sheet", sheet: string, name?: string) => void;
 }) {
   const [active, setActive] = useState(model.active);
   // What the User has typed but not yet committed. Undefined means "showing the cell".
@@ -515,7 +519,9 @@ export function SheetGrid({
           minHeight: 30,
         }}
       >
-        {model.sheets.length > 1 ? (
+        {/* Sheets are managed where they are shown. A workbook of one sheet still shows the
+            strip, because otherwise there is nowhere to add the second. */}
+        {model.sheets.length > 0 ? (
           <div style={{ display: "flex", gap: 4 }}>
             {model.sheets.map((candidate, index) => {
               const on = index === active;
@@ -550,6 +556,45 @@ export function SheetGrid({
             })}
           </div>
         ) : null}
+        {onSheets ? (
+          <div style={{ display: "flex", gap: 2, marginLeft: 6 }}>
+            <button
+              type="button"
+              title={t("sheet.add")}
+              aria-label={t("sheet.add")}
+              onClick={() => onSheets("add sheet", sheet.name, newSheetName(model))}
+              style={stripButton}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              title={t("sheet.rename")}
+              aria-label={t("sheet.rename")}
+              onClick={() => {
+                const named = window.prompt(t("sheet.rename"), sheet.name);
+                if (named && named.trim()) onSheets("rename sheet", sheet.name, named.trim());
+              }}
+              style={stripButton}
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              title={t("sheet.delete")}
+              aria-label={t("sheet.delete")}
+              // Asked before doing, because a sheet holds work and deleting it takes all of it.
+              onClick={() => {
+                if (window.confirm(t("sheet.delete_sure"))) {
+                  onSheets("delete sheet", sheet.name);
+                }
+              }}
+              style={stripButton}
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
         {note ? (
           <span className="hint" style={{ marginLeft: "auto", fontSize: 11 }}>
             {note}
@@ -558,6 +603,27 @@ export function SheetGrid({
       </div>
     </div>
   );
+}
+
+const stripButton: React.CSSProperties = {
+  border: "1px solid transparent",
+  background: "none",
+  color: "var(--muted)",
+  fontSize: 13,
+  lineHeight: 1,
+  padding: "3px 7px",
+  borderRadius: 5,
+  cursor: "pointer",
+};
+
+/** A name no sheet in the workbook has yet. */
+function newSheetName(model: GridModel): string {
+  const taken = new Set(model.sheets.map((sheet) => sheet.name));
+  for (let attempt = 1; attempt < 200; attempt += 1) {
+    const name = attempt === 1 ? "New sheet" : `New sheet ${attempt}`;
+    if (!taken.has(name)) return name;
+  }
+  return `New sheet ${Date.now()}`;
 }
 
 function countOf(range: Range): number {

@@ -9,7 +9,7 @@
  * radar chart shown as bars is a lie about the User's own file.
  */
 
-import type { Chart, ChartSeries } from "../../shared/grid.ts";
+import { columnName, type Chart, type ChartSeries } from "../../shared/grid.ts";
 
 /// Enough colours for the series a person puts on one chart, and distinguishable from each other
 /// at the size a chart is drawn here.
@@ -38,6 +38,13 @@ export function ChartView({ chart, width = 460 }: { chart: Chart; width?: number
         }}
       >
         {chart.title ?? "Chart"}
+        {/* Where the file puts it. Charts are shown in a strip under the grid rather than
+            floating over the cells, so saying the cell is how the User connects the two. */}
+        <span style={{ fontWeight: 400, color: "var(--faint)", marginLeft: 6, fontSize: 11 }}>
+          {/* The separator is in the text, not only in the margin: read aloud, "Chartat E5"
+              is what a missing space sounds like. */}
+          {` · at ${columnName(chart.atCol)}${chart.atRow + 1}`}
+        </span>
       </figcaption>
       {chart.kind === "other" ? (
         <p className="hint" style={{ margin: 0, fontSize: 12 }}>

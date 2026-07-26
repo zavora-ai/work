@@ -648,6 +648,20 @@ async fn act_on_sheet(
             range: body.range.clone().unwrap_or_default(),
         },
         "fit columns" => SheetAction::FitColumns,
+        "add sheet" => SheetAction::AddSheet {
+            name: body
+                .title
+                .clone()
+                .unwrap_or_else(|| "New sheet".to_string()),
+        },
+        "rename sheet" => SheetAction::RenameSheet {
+            to: match body.title.clone() {
+                Some(name) if !name.trim().is_empty() => name,
+                // A rename with nothing to rename it to would take the sheet's name away.
+                _ => return problem("Tell me what to call it".into(), None),
+            },
+        },
+        "delete sheet" => SheetAction::DeleteSheet,
         "chart" => SheetAction::Chart {
             // Column unless told otherwise: it is the kind that reads correctly for the most
             // data, and a wrong choice here is a chart the User has to delete.

@@ -137,6 +137,13 @@ pub const CATALOGUE: &[Entry] = &[
     p("new.could_not_start", "I could not make a start on that."),
     p("new.make_a_start", "Make a start"),
     p("new.starting", "Making a start…"),
+    p("sheet.add", "Add a sheet"),
+    p("sheet.rename", "Rename this sheet"),
+    p("sheet.delete", "Delete this sheet"),
+    p(
+        "sheet.delete_sure",
+        "Delete this sheet and everything on it?",
+    ),
     p("out.cannot_undo", "cannot be undone"),
     p("out.already_undone", "undone"),
     d("diag.nothing_yet", "Nothing recorded yet."),

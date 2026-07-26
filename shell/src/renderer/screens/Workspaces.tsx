@@ -322,6 +322,22 @@ export function SpreadsheetWorkspace(
       }
       onSelection={setSelection}
       onUndo={props.path ? () => void undoLast() : undefined}
+      onSheets={
+        props.path
+          ? (what, sheetName, name) => {
+              void (async () => {
+                await window.studio?.sheetAct?.({
+                  path: props.path!,
+                  sheet: sheetName,
+                  what,
+                  title: name,
+                  thread: props.thread ?? "spreadsheet",
+                });
+                setEditedAt(Date.now());
+              })();
+            }
+          : undefined
+      }
       onEditMany={
         props.path
           ? (sheetName, cells) => {
