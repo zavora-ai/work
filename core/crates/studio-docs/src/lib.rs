@@ -18,6 +18,8 @@
 //! that work is not needed and the document specialist was never blocked on it.
 
 use serde::{Deserialize, Serialize};
+mod sections;
+
 use zavora_docx::Document;
 
 #[derive(Debug, thiserror::Error)]
@@ -91,7 +93,13 @@ pub fn read(path: &std::path::Path) -> Result<DocModel> {
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_default(),
-        outline: outline_of(&html),
+        // A document that says what its headings are is believed. One that never used a heading
+        // style still has sections a reader can see, and showing an empty list for it left the
+        // User no way to move around a long document.
+        outline: match outline_of(&html) {
+            found if !found.is_empty() => found,
+            _ => sections::inferred_sections(&html),
+        },
         block_count: block_indices(&html).len(),
         header_html: layout.header_html,
         footer_html: layout.footer_html,
@@ -163,7 +171,7 @@ fn outline_of(html: &str) -> Vec<OutlineItem> {
 }
 
 /// Text without markup. The outline shows words, not tags.
-fn strip_tags(fragment: &str) -> String {
+pub(crate) fn strip_tags(fragment: &str) -> String {
     let mut out = String::new();
     let mut inside = false;
     for character in fragment.chars() {
