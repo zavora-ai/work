@@ -41,6 +41,21 @@ interface WorkspaceProps {
 
 /* ---------------------------------------------------------------- document */
 
+/**
+ * Point each referenced picture at the main process, which holds the token.
+ *
+ * The Core sends `<img data-media="rId7">` rather than the picture itself, because carrying them
+ * all made a 216MB document into a 288MB payload. This turns each reference into a request the
+ * main process can answer; the page still never handles a credential.
+ */
+function withPictures(html: string, path?: string): string {
+  if (!path) return html;
+  return html.replace(/<img data-media="([^"]+)"/g, (whole, id: string) => {
+    const source = `zws-media://picture?path=${encodeURIComponent(path)}&id=${encodeURIComponent(id)}`;
+    return `<img src="${source}" data-media="${id}"`;
+  });
+}
+
 export function DocumentWorkspace(
   props: WorkspaceProps & {
     state: DocumentState;
@@ -153,7 +168,7 @@ export function DocumentWorkspace(
                   const text = block?.textContent ?? "";
                   if (raw !== null && raw !== undefined) rewrite(Number(raw), text);
                 }}
-                dangerouslySetInnerHTML={{ __html: doc.model.html }}
+                dangerouslySetInnerHTML={{ __html: withPictures(doc.model.html, props.path) }}
               />
             ) : (
               <div style={{ color: "var(--muted)" }}>{t("common.loading")}</div>

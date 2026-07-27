@@ -10,7 +10,7 @@
  *   holds the credential.
  */
 
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, net, protocol, session, shell } from "electron";
 import { join } from "node:path";
 
 import {
@@ -55,6 +55,36 @@ async function corePost(path: string, body: unknown): Promise<unknown> {
   return response.json();
 }
 
+/**
+ * Serve the pictures inside a document, on request from the page.
+ *
+ * The Core no longer carries every image in the model — a 216MB document inlined to a 288MB
+ * payload, which the window cannot hold — so the view references them and something has to fetch
+ * them. That something is this process, because it is the only one holding the token: the renderer
+ * asks for `zws-media://picture?path=…&id=rId7` and never sees a credential, which is the same
+ * arrangement as every other call it makes.
+ */
+function servePictures(): void {
+  protocol.handle("zws-media", async (request) => {
+    if (!core) return new Response("", { status: 503 });
+
+    const asked = new URL(request.url);
+    const path = asked.searchParams.get("path");
+    const id = asked.searchParams.get("id");
+    if (!path || !id) return new Response("", { status: 400 });
+
+    const from = new URL(`http://127.0.0.1:${core.port}/media`);
+    from.searchParams.set("path", path);
+    from.searchParams.set("id", id);
+
+    // `net.fetch` rather than the global one so this goes through Electron's own stack, and the
+    // token is added here rather than anywhere the page can read it.
+    return net.fetch(from.toString(), {
+      headers: { Authorization: `Bearer ${core.token}` },
+    });
+  });
+}
+
 function applyContentSecurityPolicy(): void {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
@@ -65,7 +95,9 @@ function applyContentSecurityPolicy(): void {
           "script-src 'self'",
           // Vite injects styles at dev time; production uses extracted CSS.
           `style-src 'self'${isDev ? " 'unsafe-inline'" : ""}`,
-          "img-src 'self' data:",
+          // `zws-media:` is this process serving the pictures inside the User's document. Still
+          // no remote origin: the scheme resolves to the Core on loopback.
+          "img-src 'self' data: zws-media:",
           "font-src 'self'",
           // The renderer never talks to the network. It talks to the bridge.
           "connect-src 'none'",
@@ -126,8 +158,15 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
+// Declared before the app is ready, which is the only time it can be: without this the scheme is
+// treated as neither secure nor able to carry a stream, and the pictures do not load.
+protocol.registerSchemesAsPrivileged([
+  { scheme: "zws-media", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+]);
+
 app.whenReady().then(async () => {
   applyContentSecurityPolicy();
+  servePictures();
 
   ipcMain.handle("core:health", () => coreFetch("/health"));
   // Opening one of the User's own files.

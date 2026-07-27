@@ -18,6 +18,7 @@
 //! that work is not needed and the document specialist was never blocked on it.
 
 use serde::{Deserialize, Serialize};
+mod pictures;
 mod sections;
 
 use zavora_docx::Document;
@@ -91,13 +92,16 @@ pub fn read_referencing_images(path: &std::path::Path) -> Result<DocModel> {
 }
 
 /// One embedded picture from a document.
+///
+/// The document last asked for is held, because a page draws its pictures one request at a time and
+/// a book has hundreds of them: this used to read the whole file once per picture.
 pub fn media(path: &std::path::Path, embed_id: &str) -> Result<(String, Vec<u8>)> {
-    let document = Document::open(path).map_err(|e| DocError::Open {
-        detail: e.to_string(),
-    })?;
-    document.media(embed_id).ok_or(DocError::Open {
-        detail: format!("no image {embed_id} in this document"),
-    })
+    pictures::picture(path, embed_id)
+}
+
+/// Let go of the document being held. For measuring a first read, and for a test that wants one.
+pub fn forget_pictures() {
+    pictures::forget();
 }
 
 pub fn read(path: &std::path::Path) -> Result<DocModel> {
