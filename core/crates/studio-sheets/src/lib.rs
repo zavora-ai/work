@@ -133,6 +133,12 @@ pub struct Sheet {
     /// with none, so the interface draws nothing rather than a chart of nothing.
     #[serde(default)]
     pub charts: Vec<crate::charts::Drawing>,
+    /// The first row and column that scroll, where the file freezes its headings. Zero means
+    /// nothing is frozen.
+    #[serde(default)]
+    pub frozen_row: u32,
+    #[serde(default)]
+    pub frozen_col: u16,
 }
 
 impl Sheet {
@@ -251,6 +257,7 @@ pub fn read(path: &std::path::Path, window: Window) -> Result<GridModel> {
 
 fn read_sheet(worksheet: &zavora_xlsx::Worksheet, window: Window) -> Sheet {
     let name = worksheet.name().to_string();
+    let frozen = worksheet.frozen_at();
     let Some((first_row, first_col, last_row, last_col)) = worksheet.used_range() else {
         return Sheet {
             name,
@@ -261,6 +268,8 @@ fn read_sheet(worksheet: &zavora_xlsx::Worksheet, window: Window) -> Sheet {
             column_widths: Vec::new(),
             // Filled in a second pass, once every sheet has been read.
             charts: Vec::new(),
+            frozen_row: 0,
+            frozen_col: 0,
         };
     };
 
@@ -299,6 +308,8 @@ fn read_sheet(worksheet: &zavora_xlsx::Worksheet, window: Window) -> Sheet {
         merges,
         column_widths,
         charts: Vec::new(),
+        frozen_row: frozen.0,
+        frozen_col: frozen.1,
     }
 }
 

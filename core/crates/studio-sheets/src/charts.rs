@@ -244,6 +244,8 @@ mod tests {
             merges: Vec::new(),
             column_widths: Vec::new(),
             charts: Vec::new(),
+            frozen_row: 0,
+            frozen_col: 0,
         }
     }
 

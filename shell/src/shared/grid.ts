@@ -54,6 +54,9 @@ export interface Sheet {
   columnWidths: (number | null)[];
   /** The charts drawn on this sheet, with their numbers already resolved by the Core. */
   charts?: Chart[];
+  /** The first row and column that scroll, where the file freezes its headings. 0 means none. */
+  frozenRow?: number;
+  frozenCol?: number;
 }
 
 /** One series of a chart. A missing value is null, not zero: a gap is not a measurement. */

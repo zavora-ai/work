@@ -31,6 +31,8 @@ let wasWorkingHere = false;
 const ROW_HEADER = 44;
 const DEFAULT_COLUMN = 96;
 const ROW_HEIGHT = 25;
+/// How tall the column-letter row is, so a frozen row can be held just below it.
+const HEADER_HEIGHT = 25;
 
 /** A rectangle of cells, in absolute coordinates. */
 export interface Range {
@@ -681,6 +683,10 @@ function Grid({
   }
 
   const covered = useMemo(() => coveredBy(sheet), [sheet]);
+  // Where the file freezes. Held here rather than passed down, because the grid is what has to
+  // keep them still.
+  const frozenRows = sheet.frozenRow ?? 0;
+  const frozenCols = sheet.frozenCol ?? 0;
 
   // Column widths as the file has them. Excel measures a column in characters, so it is turned
   // into pixels here rather than in the Core, which reports what the file says.
@@ -760,7 +766,22 @@ function Grid({
           <div
             key={absoluteRow}
             role="row"
-            style={{ display: "grid", gridTemplateColumns: template, minHeight: ROW_HEIGHT }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: template,
+              minHeight: ROW_HEIGHT,
+              // Rows above the freeze stay put. The interface could already freeze the headings
+              // and then let them scroll away, which is the User doing something and being
+              // ignored.
+              ...(frozenRows > absoluteRow
+                ? {
+                    position: "sticky" as const,
+                    top: HEADER_HEIGHT + (absoluteRow - sheet.firstRow) * ROW_HEIGHT,
+                    zIndex: 2,
+                    background: "#fff",
+                  }
+                : {}),
+            }}
           >
             <button
               type="button"
@@ -787,6 +808,12 @@ function Grid({
             {row.map((cell, colIndex) => {
               const absoluteCol = sheet.firstCol + colIndex;
               if (covered.has(`${absoluteRow}:${absoluteCol}`)) return null;
+              // Columns left of the freeze stay put as the grid scrolls sideways, stacked after
+              // the row header which is already held there.
+              const held = frozenCols > absoluteCol;
+              const heldAt =
+                ROW_HEADER +
+                widths.slice(0, absoluteCol - sheet.firstCol).reduce((sum, w) => sum + w, 0);
               const merge = (sheet.merges ?? []).find(
                 (candidate) =>
                   candidate.firstRow === absoluteRow && candidate.firstCol === absoluteCol,
@@ -808,6 +835,7 @@ function Grid({
                       : undefined
                   }
                   label={cellRef(absoluteRow, absoluteCol)}
+                  heldAt={held ? heldAt : undefined}
                   editing={isSelected ? editing : undefined}
                   onTyping={onTyping}
                   onCommit={onCommit}
@@ -830,6 +858,7 @@ function CellView({
   inRange,
   span,
   label,
+  heldAt,
   editing,
   onSelect,
   onOpen,
@@ -843,6 +872,8 @@ function CellView({
   /** How many columns and rows this cell covers, when the file merges it with its neighbours. */
   span?: { across: number; down: number };
   label: string;
+  /** Where to hold this cell when its column is frozen. Undefined when it scrolls. */
+  heldAt?: number;
   editing?: string;
   onSelect: (extend: boolean) => void;
   onOpen: () => void;
@@ -877,6 +908,9 @@ function CellView({
             : (style.background ?? "transparent"),
         outline: selected ? "2px solid #6f8fa8" : "none",
         outlineOffset: -2,
+        ...(heldAt === undefined
+          ? {}
+          : { position: "sticky" as const, left: heldAt, zIndex: 1, background: "#fff" }),
         cursor: "cell",
         overflow: "hidden",
         textOverflow: "ellipsis",

@@ -641,7 +641,14 @@ async fn act_on_sheet(
             has_header: body.has_header,
         },
         "freeze" => SheetAction::Freeze {
-            at: body.at.clone().unwrap_or_else(|| "A2".to_string()),
+            // A cell, not a column. `at` carries a column letter for the column actions, and
+            // sending "A" here is not a place — it failed with "no row in 'A'", which the
+            // interface only started reporting once every reply's status was read.
+            at: format!(
+                "{}{}",
+                body.at.clone().unwrap_or_else(|| "A".to_string()),
+                body.at_row.unwrap_or(2)
+            ),
         },
         "unfreeze" => SheetAction::Unfreeze,
         "merge" => SheetAction::Merge {
