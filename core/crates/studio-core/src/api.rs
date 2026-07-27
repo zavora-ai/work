@@ -275,6 +275,7 @@ pub fn router(api: Arc<Api>) -> Router {
         // off when the presenter moves on.
         .route("/present/begin", axum::routing::post(present_begin))
         .route("/present/say", axum::routing::post(present_say))
+        .route("/present/ask", axum::routing::post(present_ask))
         .route("/present/hush", axum::routing::post(present_hush))
         .route("/present/end", axum::routing::post(present_end))
         .route("/present/heard", get(present_heard))
@@ -1630,6 +1631,48 @@ async fn present_say(
     }
 }
 
+/// Someone in the room has a question.
+///
+/// In words or in speech: a question typed at the back of the room and one asked out loud are the
+/// same question, and both interrupt.
+#[cfg(feature = "adk")]
+async fn present_ask(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<AskRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(presenter) = crate::live::presenter().await else {
+        return problem("Nobody is presenting".into(), None);
+    };
+
+    let asked = match (body.question.as_deref(), body.spoken.as_deref()) {
+        (Some(question), _) if !question.trim().is_empty() => presenter.asked(question).await,
+        (_, Some(samples)) if !samples.is_empty() => presenter.heard_question(samples).await,
+        _ => return problem("There was no question".into(), None),
+    };
+
+    match asked {
+        Ok(()) => Json(serde_json::json!({ "asked": true })).into_response(),
+        Err(detail) => problem(
+            "Work Studio could not put that question".into(),
+            Some(&detail),
+        ),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AskRequest {
+    /// A question in words.
+    #[serde(default)]
+    pub question: Option<String>,
+    /// A question asked out loud, as base64 samples.
+    #[serde(default)]
+    pub spoken: Option<String>,
+}
+
 /// Stop talking, now — the presenter has moved on, or someone has a question.
 #[cfg(feature = "adk")]
 async fn present_hush(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
@@ -1717,6 +1760,14 @@ mod not_presenting {
         refuse(&api, &headers)
     }
 
+    pub(super) async fn present_ask(
+        State(api): State<Arc<Api>>,
+        headers: HeaderMap,
+        Json(_body): Json<AskRequest>,
+    ) -> axum::response::Response {
+        refuse(&api, &headers)
+    }
+
     pub(super) async fn present_hush(
         State(api): State<Arc<Api>>,
         headers: HeaderMap,
@@ -1750,7 +1801,9 @@ mod not_presenting {
 }
 
 #[cfg(not(feature = "adk"))]
-use not_presenting::{present_begin, present_end, present_heard, present_hush, present_say};
+use not_presenting::{
+    present_ask, present_begin, present_end, present_heard, present_hush, present_say,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct BeginRequest {

@@ -92,6 +92,46 @@ impl Live {
             .map_err(|error| error.to_string())
     }
 
+    /// Someone in the room has a question.
+    ///
+    /// Interrupts first, because a question asked over the presenter is a question asked while it
+    /// is talking — that is what a question in a room is. The answer comes from the deck, and the
+    /// session was told to say so when the deck does not say.
+    pub async fn asked(&self, question: &str) -> Result<(), String> {
+        let _ = self.session.interrupt().await;
+        self.session
+            .send_text(&format!(
+                "Someone in the audience asks: {question}\n\nAnswer briefly, from what this deck \
+                 says. If the deck does not say, say that it does not."
+            ))
+            .await
+            .map_err(|error| error.to_string())?;
+        self.session
+            .create_response()
+            .await
+            .map_err(|error| error.to_string())
+    }
+
+    /// A question asked out loud, as recorded samples.
+    ///
+    /// Sent as it arrived. The session hears it and decides for itself when the asker has finished,
+    /// which is a judgement about a room and not one to make here.
+    pub async fn heard_question(&self, samples_base64: &str) -> Result<(), String> {
+        let _ = self.session.interrupt().await;
+        self.session
+            .send_audio_base64(samples_base64)
+            .await
+            .map_err(|error| error.to_string())?;
+        self.session
+            .commit_audio()
+            .await
+            .map_err(|error| error.to_string())?;
+        self.session
+            .create_response()
+            .await
+            .map_err(|error| error.to_string())
+    }
+
     /// Stop talking, now.
     pub async fn hush(&self) -> Result<(), String> {
         self.session

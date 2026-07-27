@@ -84,6 +84,8 @@ export interface StudioBridge {
    */
   presentBegin(body: { voice?: string; about?: string }): Promise<unknown>;
   presentSay(body: { words: string }): Promise<unknown>;
+  /** Put a question to the presenter, in words or in speech. Both interrupt. */
+  presentAsk(body: { question?: string; spoken?: string }): Promise<unknown>;
   presentHush(): Promise<unknown>;
   presentEnd(): Promise<unknown>;
   /** Whatever has been said since last asked: sound to play and words to show. */

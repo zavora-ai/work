@@ -236,6 +236,7 @@ app.whenReady().then(async () => {
   // Presenting live. The session is the Core's; this only carries the asking and the answers.
   ipcMain.handle("core:presentBegin", (_event, body: unknown) => corePost("/present/begin", body));
   ipcMain.handle("core:presentSay", (_event, body: unknown) => corePost("/present/say", body));
+  ipcMain.handle("core:presentAsk", (_event, body: unknown) => corePost("/present/ask", body));
   ipcMain.handle("core:presentHush", () => corePost("/present/hush", {}));
   ipcMain.handle("core:presentEnd", () => corePost("/present/end", {}));
   ipcMain.handle("core:presentHeard", () => coreFetch("/present/heard"));

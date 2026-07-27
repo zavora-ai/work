@@ -44,6 +44,10 @@ export function Presenting({
   // Whether the presenting is being done aloud, and what is being said now.
   const [aloud, setAloud] = useState(false);
   const [saying, setSaying] = useState<string | undefined>();
+  // A question from the room. Typed, because a presenter with a laptop can type and a microphone in
+  // a room full of people picks up the room.
+  const [asking, setAsking] = useState(false);
+  const [question, setQuestion] = useState("");
 
   // The presenter is a session held open by the Core while the deck is up. Sound arrives in pieces
   // and is queued as it comes, so the voice keeps up with the slide.
@@ -232,6 +236,45 @@ export function Presenting({
         </div>
       ) : null}
 
+      {asking ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            const put = question.trim();
+            if (!put) return;
+            setQuestion("");
+            setAsking(false);
+            setSaying("");
+            player.current?.stop();
+            void (async () => {
+              await bridge()?.presentAsk?.({ question: put });
+              void listen();
+            })();
+          }}
+          style={{ maxWidth: 900, margin: "0 auto 10px", display: "flex", gap: 8 }}
+        >
+          <input
+            autoFocus
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            placeholder={t("present.ask_placeholder")}
+            aria-label={t("present.ask")}
+            style={{
+              flex: 1,
+              background: "#1d1b18",
+              border: "1px solid #33302a",
+              borderRadius: 6,
+              color: "#e8e5e0",
+              padding: "7px 10px",
+              fontSize: 13,
+            }}
+          />
+          <button type="submit" style={dark}>
+            {t("present.put_it")}
+          </button>
+        </form>
+      ) : null}
+
       {showNotes && slide.notes ? (
         <div
           style={{
@@ -279,6 +322,11 @@ export function Presenting({
             aria-pressed={showNotes}
           >
             {t("present.notes")}
+          </button>
+        ) : null}
+        {aloud ? (
+          <button type="button" onClick={() => setAsking((open) => !open)} style={dark}>
+            {t("present.ask")}
           </button>
         ) : null}
         {talk && talk.length > 0 ? (
