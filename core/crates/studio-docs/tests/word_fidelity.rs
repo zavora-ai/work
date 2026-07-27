@@ -151,3 +151,38 @@ fn every_block_in_a_word_document_is_addressable() {
          {indices:?}"
     );
 }
+
+/// A document under review: comments, pending changes, more than one section, an equation, and a
+/// language that reads the other way.
+#[test]
+fn a_document_under_review_arrives_readable() {
+    let Some((html, model)) = html("review") else {
+        return;
+    };
+
+    assert!(
+        html.contains("Payment is due on receipt"),
+        "a phrase someone has commented on is missing from the view"
+    );
+    assert!(
+        html.contains("twelve"),
+        "text a reviewer has inserted is not shown, so the document reads as it was rather than          as it is being changed to"
+    );
+    assert!(html.contains("اتفاقية"), "right-to-left text is dropped");
+    assert!(
+        html.contains("class=\"formula\""),
+        "an equation is drawn as an empty line, and the User cannot see the formula in their own          document"
+    );
+    assert!(
+        html.contains("mc"),
+        "the formula is marked but says nothing"
+    );
+
+    // Both sections' headings are in the outline, so the document's shape is not truncated at the
+    // section break.
+    let headings: Vec<&str> = model.outline.iter().map(|i| i.text.as_str()).collect();
+    assert!(
+        headings.contains(&"2. Schedule A"),
+        "the second section's heading is missing from the outline: {headings:?}"
+    );
+}

@@ -11,3 +11,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 zavora-docx = { path = "../../../../zavora-docx/crates/zavora-docx" }
+
+[dev-dependencies]
+# Reading the saved file directly, to check what an edit left behind.
+zip = { version = "2", default-features = false, features = ["deflate"] }

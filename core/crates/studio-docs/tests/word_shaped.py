@@ -24,6 +24,8 @@ CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>
 <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
 <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
+<Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
+<Override PartName="/word/comments.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"/>
 </Types>"""
 
 ROOT_RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -39,6 +41,8 @@ DOC_RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
 <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
 <Relationship Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/terms" TargetMode="External"/>
+<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/>
+<Relationship Id="rId8" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/>
 </Relationships>"""
 
 # Styles as Word writes them: an id that has no space, a name that does.
@@ -79,6 +83,19 @@ FOOTER = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>
 </w:ftr>"""
 
+# A second section's header, because a contract's schedules are usually headed differently.
+HEADER2 = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:p><w:r><w:t>Schedule A — Services</w:t></w:r></w:p>
+</w:hdr>"""
+
+COMMENTS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:comment w:id="1" w:author="Reviewer" w:date="2026-01-05T10:00:00Z" w:initials="R">
+<w:p><w:r><w:t>Should this be net 30?</w:t></w:r></w:p>
+</w:comment>
+</w:comments>"""
+
 DOCUMENT = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -116,11 +133,31 @@ DOCUMENT = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!-- A page break, written as a run. -->
 <w:p><w:r><w:br w:type="page"/></w:r></w:p>
 
+<!-- A comment anchored to a phrase, which is how a document under review looks. -->
+<w:p><w:commentRangeStart w:id="1"/><w:r><w:t>Payment is due on receipt</w:t></w:r><w:commentRangeEnd w:id="1"/><w:r><w:commentReference w:id="1"/></w:r></w:p>
+
+<!-- Tracked changes: an insertion and a deletion, both still pending. -->
+<w:p>
+<w:r><w:t xml:space="preserve">The term is </w:t></w:r>
+<w:ins w:id="10" w:author="Reviewer" w:date="2026-01-05T10:00:00Z"><w:r><w:t>twelve</w:t></w:r></w:ins>
+<w:del w:id="11" w:author="Reviewer" w:date="2026-01-05T10:00:00Z"><w:r><w:delText>six</w:delText></w:r></w:del>
+<w:r><w:t xml:space="preserve"> months.</w:t></w:r>
+</w:p>
+
+<!-- Right-to-left text, which reads backwards if the direction is dropped. -->
+<w:p><w:pPr><w:bidi/></w:pPr><w:r><w:rPr><w:rtl/></w:rPr><w:t>اتفاقية الخدمات</w:t></w:r></w:p>
+
+<!-- An equation, as Word writes one. -->
+<w:p><m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:oMath><m:r><m:t>E = mc²</m:t></m:r></m:oMath></m:oMathPara></w:p>
+
+<!-- A section break, so what follows is headed differently. -->
+<w:p><w:pPr><w:sectPr><w:headerReference w:type="default" r:id="rId4"/><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:pPr></w:p>
+
 <w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>2. Schedule A</w:t></w:r></w:p>
 <w:p><w:r><w:t>The services are described here.</w:t></w:r></w:p>
 
 <w:sectPr>
-<w:headerReference w:type="default" r:id="rId4"/>
+<w:headerReference w:type="default" r:id="rId7"/>
 <w:footerReference w:type="default" r:id="rId5"/>
 <w:pgSz w:w="11906" w:h="16838"/>
 <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708"/>
@@ -141,6 +178,8 @@ def main() -> None:
         z.writestr("word/footnotes.xml", FOOTNOTES)
         z.writestr("word/header1.xml", HEADER)
         z.writestr("word/footer1.xml", FOOTER)
+        z.writestr("word/header2.xml", HEADER2)
+        z.writestr("word/comments.xml", COMMENTS)
     print(f"wrote {path}")
 
 
