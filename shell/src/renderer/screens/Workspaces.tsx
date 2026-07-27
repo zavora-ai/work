@@ -11,7 +11,7 @@
  * have opened PowerPoint.
  */
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSheet } from "../useSheet.ts";
 import type { DeckState, DocumentState } from "../useArtefact.ts";
@@ -793,6 +793,42 @@ export function DeckWorkspace(
 
   const slides = deck.model?.slides ?? [];
   const slide = slides[active];
+
+  // Writing what to say over a slide, open only when asked for: the notes are the presenter's, not
+  // part of the slide, and a box for them sitting under every deck would suggest otherwise.
+  const [writingNotes, setWritingNotes] = useState(false);
+  const [notes, setNotes] = useState("");
+  const [trouble, setTrouble] = useState<string | undefined>();
+
+  /**
+   * Do something structural to the deck.
+   *
+   * Named actions, the same closed set the Core offers, so the interface cannot ask for anything the
+   * Core has not agreed to do. The deck is re-read afterwards because a slide added or moved changes
+   * every number the interface is showing.
+   */
+  const act = useCallback(
+    async (what: string, extra?: Record<string, unknown>) => {
+      const path = props.path;
+      if (!path) return;
+      setTrouble(undefined);
+      const answer = (await bridge()?.deckAct?.({
+        path,
+        slide: active + 1,
+        what,
+        thread: props.thread,
+        ...extra,
+      })) as { problem?: string } | undefined;
+      if (answer?.problem) {
+        setTrouble(answer.problem);
+        return;
+      }
+      // The deck is re-read from the file rather than adjusted here: a slide added or moved changes
+      // every number the interface is showing, and two copies of that arithmetic would disagree.
+      props.onChanged?.();
+    },
+    [active, props.onChanged, props.path, props.thread],
+  );
   // Presenting takes over the screen, so it is a state of this workspace rather than a route: the
   // deck being presented is the deck that was open.
   const [presenting, setPresenting] = useState(false);
@@ -854,19 +890,65 @@ export function DeckWorkspace(
           >
             {t("deck.present")}
           </Button>
-          <Button small>Text</Button>
-          <Button small>Shape</Button>
-          <Button small>Chart</Button>
-          <Button small>Colours</Button>
+          <Button small title="Add a slide after this one" onClick={() => void act("add slide")}>
+            {t("deck.add_slide")}
+          </Button>
+          <Button
+            small
+            title="Another slide the same, after this one"
+            onClick={() => void act("duplicate slide")}
+            disabled={slides.length === 0}
+          >
+            {t("deck.copy_slide")}
+          </Button>
+          <Button
+            small
+            title="Move this slide one earlier"
+            onClick={() => void act("move slide", { to: active })}
+            disabled={active < 1}
+          >
+            {t("deck.move_up")}
+          </Button>
+          <Button
+            small
+            title="Move this slide one later"
+            onClick={() => void act("move slide", { to: active + 2 })}
+            disabled={active >= slides.length - 1}
+          >
+            {t("deck.move_down")}
+          </Button>
+          <Button
+            small
+            title="Write what to say over this slide"
+            onClick={() => {
+              // Opened with what the slide already says, so a note is edited rather than silently
+              // replaced by whatever is typed next.
+              setNotes(slide?.notes ?? "");
+              setWritingNotes((open) => !open);
+            }}
+            disabled={slides.length === 0}
+          >
+            {t("deck.notes")}
+          </Button>
+          <Button
+            small
+            title="Remove this slide"
+            onClick={() => void act("delete slide")}
+            disabled={slides.length < 2}
+          >
+            {t("deck.delete_slide")}
+          </Button>
         </>
       }
       status={
         <span style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
-          {deck.problem
-            ? deck.problem
-            : selected
-              ? t("deck.selected_shape")
-              : `${slides.length} ${t("deck.slides")}`}
+          {trouble
+            ? trouble
+            : deck.problem
+              ? deck.problem
+              : selected
+                ? t("deck.selected_shape")
+                : `${slides.length} ${t("deck.slides")}`}
         </span>
       }
       canvas={
@@ -897,6 +979,50 @@ export function DeckWorkspace(
                 <div style={{ padding: 24, color: "var(--muted)" }}>{t("common.loading")}</div>
               )}
             </div>
+            {writingNotes && slide ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setWritingNotes(false);
+                  void act("set notes", { words: notes });
+                }}
+                style={{ display: "grid", gap: 6, width: 520 }}
+              >
+                <textarea
+                  autoFocus
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder={t("deck.notes_placeholder")}
+                  aria-label={t("deck.notes")}
+                  rows={3}
+                  style={{
+                    width: "100%",
+                    background: "#fff",
+                    border: "1px solid #dedad2",
+                    borderRadius: 3,
+                    padding: "7px 9px",
+                    fontSize: 12.5,
+                    fontFamily: "inherit",
+                    color: "var(--ink)",
+                    resize: "vertical",
+                  }}
+                />
+                <div>
+                  {/* Acts on the press rather than on the form's submission: the shared button is a
+                      plain button by design, so a form around it is never submitted and the press
+                      would do nothing at all. */}
+                  <Button
+                    small
+                    onClick={() => {
+                      setWritingNotes(false);
+                      void act("set notes", { words: notes });
+                    }}
+                  >
+                    {t("deck.save_notes")}
+                  </Button>
+                </div>
+              </form>
+            ) : null}
             {slides.length > 1 && (
               <div style={{ display: "flex", gap: 8 }} role="tablist">
                 {slides.map((each, index) => (

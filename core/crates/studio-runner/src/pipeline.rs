@@ -111,6 +111,86 @@ pub fn progress_for(operation: &str) -> Option<&'static str> {
     })
 }
 
+/// The structural things the User can do to a deck by hand.
+///
+/// The same closed set as a spreadsheet's, and for the same reason: every one of these is a real
+/// operation on the other side of the connection, and nothing else can be reached this way. Adding
+/// to what the interface can do to the User's file means adding a variant here.
+///
+/// These are the actions a person expects of a deck and could not perform at all until now — the
+/// deck could be drawn, presented and spoken, but a slide could not be added, removed, moved or
+/// given notes except by asking for it in words.
+#[derive(Debug, Clone)]
+pub enum DeckAction {
+    /// Add a slide, after the one being looked at.
+    AddSlide { layout: Option<String> },
+    /// Remove this slide, and everything on it.
+    DeleteSlide,
+    /// Another slide the same, immediately after it.
+    DuplicateSlide,
+    /// Move this slide to another place in the deck. `to` counts from one, as the interface shows it.
+    MoveSlide { to: usize },
+    /// What the presenter should say over this slide.
+    SetNotes { words: String },
+    /// The slide's title.
+    SetTitle { words: String },
+}
+
+impl DeckAction {
+    /// The operation this asks for, in the capability server's own words.
+    pub fn operation(&self) -> &'static str {
+        match self {
+            Self::AddSlide { .. } => "add_slide",
+            Self::DeleteSlide => "delete_slide",
+            Self::DuplicateSlide => "duplicate_slide",
+            Self::MoveSlide { .. } => "move_slide",
+            Self::SetNotes { .. } => "set_notes",
+            Self::SetTitle { .. } => "set_title",
+        }
+    }
+
+    /// What to send with it. `slide` is the slide being looked at, counting from one.
+    ///
+    /// The server counts slides from zero and refuses a field it does not know, so these names are
+    /// its names — a spelling of my own was accepted by the gate and then refused by the connection,
+    /// which reads to the User as the action simply not working.
+    pub fn arguments(&self, slide: usize) -> serde_json::Value {
+        let index = slide.saturating_sub(1);
+        match self {
+            Self::AddSlide { layout } => serde_json::json!({
+                "layout": layout.clone().unwrap_or_else(|| "title_content".to_string()),
+            }),
+            Self::DeleteSlide | Self::DuplicateSlide => serde_json::json!({
+                "slide": index,
+            }),
+            Self::MoveSlide { to } => serde_json::json!({
+                "from": index,
+                "to": to.saturating_sub(1),
+            }),
+            Self::SetNotes { words } => serde_json::json!({
+                "slide": index,
+                "text": words,
+            }),
+            Self::SetTitle { words } => serde_json::json!({
+                "slide": index,
+                "text": words,
+            }),
+        }
+    }
+
+    /// What to tell the User this did, in their own words, for the one history both authors write to.
+    pub fn described(&self) -> String {
+        match self {
+            Self::AddSlide { .. } => "Added a slide".to_string(),
+            Self::DeleteSlide => "Removed a slide".to_string(),
+            Self::DuplicateSlide => "Copied a slide".to_string(),
+            Self::MoveSlide { to } => format!("Moved a slide to {to}"),
+            Self::SetNotes { .. } => "Changed what to say over a slide".to_string(),
+            Self::SetTitle { words } => format!("Titled a slide {words}"),
+        }
+    }
+}
+
 /// The structural things the User can do to a spreadsheet by hand.
 ///
 /// A closed set, on purpose. Every one of these is a real operation on the other side of the
@@ -963,6 +1043,82 @@ impl Engine {
             .call(
                 "save_workbook",
                 serde_json::json!({ "workbook_id": handle, "file_path": path }),
+            )
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+        Ok(())
+    }
+
+    /// A structural change to a deck, by hand.
+    ///
+    /// Adding a slide, removing one, moving one, writing what to say over it. Until now a deck could
+    /// be drawn, presented and spoken but not rearranged: the User had to ask for it in words, which
+    /// is a strange thing to do to reorder two slides.
+    ///
+    /// Named actions rather than a passthrough, and through the gate and the same save path, so
+    /// there remains one way into the file whoever is asking.
+    pub async fn act_on_deck(
+        &self,
+        path: &str,
+        slide: usize,
+        action: DeckAction,
+    ) -> Result<(), RunError> {
+        let file = std::path::Path::new(path);
+        let kind = ArtefactKind::of(file).ok_or(RunError::UnknownKind)?;
+        if kind != ArtefactKind::Presentation {
+            return Err(RunError::UnknownKind);
+        }
+        let binary = self.command_for(kind)?;
+        let server = Server::start(kind.server_spec(binary.to_string_lossy()))
+            .await
+            .map_err(|detail| RunError::ServerUnavailable { detail })?;
+
+        let operation = action.operation();
+        let classifier = kind.classifier();
+        for gated in [operation, "save_presentation"] {
+            let decision = studio_gate::decide(
+                &classifier,
+                kind.server_name(),
+                gated,
+                JobKind::OneOff,
+                JobState::Active,
+                RunMode::Live,
+                false,
+            );
+            if matches!(decision, studio_gate::Decision::Suppress { .. }) {
+                return Err(RunError::NotAllowed {
+                    detail: format!("the gate refused {gated}"),
+                });
+            }
+        }
+
+        let opened = server
+            .call(
+                "open_presentation",
+                serde_json::json!({ "file_path": path }),
+            )
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+        let handle = find_handle(&opened).ok_or_else(|| RunError::Failed {
+            detail: format!("no handle in the answer to open_presentation: {opened}"),
+        })?;
+
+        let mut arguments = action.arguments(slide);
+        if let Some(object) = arguments.as_object_mut() {
+            object.insert("handle".to_string(), serde_json::json!(handle));
+        }
+
+        // `call` refuses on an error reply, so a refusal is not reported as a success.
+        server
+            .call(operation, arguments)
+            .await
+            .map_err(|detail| RunError::Failed { detail })?;
+
+        server
+            .call(
+                "save_presentation",
+                // The server calls it the place to write to, not the file that was opened.
+                serde_json::json!({ "handle": handle, "output_path": path }),
             )
             .await
             .map_err(|detail| RunError::Failed { detail })?;

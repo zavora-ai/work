@@ -103,6 +103,9 @@ export interface StudioBridge {
    * Do something to the sheet itself: insert or delete rows and columns, sort, freeze, merge,
    * fit the columns. A closed set of named actions, not a way to send any operation through.
    */
+  /** Add, remove, copy or move a slide, or write what to say over it. */
+  deckAct(body: Record<string, unknown>): Promise<unknown>;
+
   sheetAct(body: Record<string, unknown>): Promise<unknown>;
 
   /** Put an undone change forward again. */

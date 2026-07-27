@@ -161,6 +161,17 @@ pub const CATALOGUE: &[Entry] = &[
         "Work Studio has not been allowed to hear you.",
     ),
     p("deck.present", "Present"),
+    p("deck.add_slide", "Add slide"),
+    p("deck.copy_slide", "Copy slide"),
+    p("deck.move_up", "Move up"),
+    p("deck.move_down", "Move down"),
+    p("deck.notes", "What to say"),
+    p("deck.delete_slide", "Delete slide"),
+    p(
+        "deck.notes_placeholder",
+        "What should be said over this slide?",
+    ),
+    p("deck.save_notes", "Keep it"),
     p("sheet.rename", "Rename this sheet"),
     p("sheet.delete", "Delete this sheet"),
     p(

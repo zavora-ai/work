@@ -44,6 +44,8 @@ export interface SlideView {
   svg: string;
   itemCount: number;
   targets: (Target | null)[];
+  /** What the presenter should say over this slide, where the file carries it. */
+  notes?: string;
 }
 
 export interface DeckModel {

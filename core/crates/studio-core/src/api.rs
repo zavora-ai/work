@@ -296,6 +296,7 @@ pub fn router(api: Arc<Api>) -> Router {
         .route("/undo", axum::routing::post(undo))
         .route("/redo", axum::routing::post(redo))
         .route("/sheet/act", axum::routing::post(act_on_sheet))
+        .route("/deck/act", axum::routing::post(act_on_deck))
         // What each specialist may reach, and which of those are on.
         .route("/capabilities", get(capabilities).post(add_capability))
         .route("/capabilities/act", axum::routing::post(act_on_capability))
@@ -721,6 +722,97 @@ async fn act_on_sheet(
         }
         Err(error) => problem(error.to_string(), error.detail()),
     }
+}
+
+/// What the User asks to have done to a deck.
+#[derive(Debug, Deserialize)]
+pub struct DeckActionRequest {
+    pub path: String,
+    /// The slide being looked at, counting from one, as the interface shows it.
+    #[serde(default)]
+    pub slide: usize,
+    /// The action, in the interface's own words.
+    pub what: String,
+    /// Where to move a slide to, counting from one.
+    #[serde(default)]
+    pub to: Option<usize>,
+    /// Words, for notes or a title.
+    #[serde(default)]
+    pub words: Option<String>,
+    pub thread: Option<String>,
+}
+
+/// Add, remove, copy, move a slide, or write what to say over it.
+///
+/// The same gate and the same history as any other change, because a slide the User moved and a
+/// slide an agent moved are the same kind of thing.
+#[cfg(feature = "adk")]
+async fn act_on_deck(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<DeckActionRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(engine) = api.engine() else {
+        return problem("Work Studio cannot change that file yet".into(), None);
+    };
+
+    use studio_runner::pipeline::DeckAction;
+    let action = match body.what.as_str() {
+        "add slide" => DeckAction::AddSlide { layout: None },
+        "delete slide" => DeckAction::DeleteSlide,
+        "duplicate slide" => DeckAction::DuplicateSlide,
+        "move slide" => match body.to {
+            // Moving a slide nowhere is not a move, and guessing a destination would rearrange the
+            // User's deck for them.
+            Some(to) if to > 0 => DeckAction::MoveSlide { to },
+            _ => return problem("Tell me where to move it".into(), None),
+        },
+        "set notes" => DeckAction::SetNotes {
+            words: body.words.clone().unwrap_or_default(),
+        },
+        "set title" => match body.words.clone() {
+            Some(words) if !words.trim().is_empty() => DeckAction::SetTitle { words },
+            _ => return problem("Tell me what to call it".into(), None),
+        },
+        // An action nobody offers is refused rather than approximated.
+        other => {
+            return problem(
+                "Work Studio does not know how to do that to a deck".into(),
+                Some(other),
+            );
+        }
+    };
+
+    let said = action.described();
+    let slide = body.slide.max(1);
+    match engine.act_on_deck(&body.path, slide, action).await {
+        Ok(()) => {
+            if let Some(keeper) = api.keeper.as_ref() {
+                keeper.record_change(&body.path, &said, true);
+                keeper.log("action", &said);
+                if let Some(thread) = body.thread.as_deref() {
+                    let _ = keeper.ensure_thread(thread, "Editing by hand", Some(&body.path));
+                }
+            }
+            Json(serde_json::json!({ "done": true, "did": said })).into_response()
+        }
+        Err(error) => problem(error.to_string(), error.detail()),
+    }
+}
+
+#[cfg(not(feature = "adk"))]
+async fn act_on_deck(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(_body): Json<DeckActionRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    problem("Work Studio cannot change that file yet".into(), None)
 }
 
 #[cfg(not(feature = "adk"))]
