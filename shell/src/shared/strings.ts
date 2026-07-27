@@ -138,6 +138,7 @@ export const CATALOGUE = {
   "new.make_a_start": p("Make a start"),
   "new.starting": p("Making a start…"),
   "sheet.add": p("Add a sheet"),
+  "doc.page": p("Page"),
   "sheet.rename": p("Rename this sheet"),
   "sheet.delete": p("Delete this sheet"),
   "sheet.delete_sure": p("Delete this sheet and everything on it?"),

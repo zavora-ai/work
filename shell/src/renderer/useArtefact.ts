@@ -21,6 +21,15 @@ export interface DocumentModel {
   footerHtml?: string;
   blockCount: number;
   outline: { text: string; level: number }[];
+  /** The page as the document describes it, in CSS pixels, so a page can be drawn as one. */
+  page?: {
+    width: number;
+    height: number;
+    marginTop: number;
+    marginRight: number;
+    marginBottom: number;
+    marginLeft: number;
+  };
 }
 
 /** What a click on a drawn element refers to. */

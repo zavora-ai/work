@@ -138,6 +138,7 @@ pub const CATALOGUE: &[Entry] = &[
     p("new.make_a_start", "Make a start"),
     p("new.starting", "Making a start…"),
     p("sheet.add", "Add a sheet"),
+    p("doc.page", "Page"),
     p("sheet.rename", "Rename this sheet"),
     p("sheet.delete", "Delete this sheet"),
     p(

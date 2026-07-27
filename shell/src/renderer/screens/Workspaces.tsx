@@ -11,7 +11,7 @@
  * have opened PowerPoint.
  */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { useSheet } from "../useSheet.ts";
 import type { DeckState, DocumentState } from "../useArtefact.ts";
@@ -54,6 +54,98 @@ function withPictures(html: string, path?: string): string {
     const source = `zws-media://picture?path=${encodeURIComponent(path)}&id=${encodeURIComponent(id)}`;
     return `<img src="${source}" data-media="${id}"`;
   });
+}
+
+/**
+ * The document's pages.
+ *
+ * Split where the document says a page ends. Word decides most of its own breaks by how the text
+ * happens to fall, which needs a typesetter to reproduce; a break the author put in is a fact about
+ * the file, and every one of them is shown. A document with none is one page, which is honest — it
+ * is what the file declares — and it no longer looks like one endless sheet when it is not.
+ */
+/**
+ * Where the pages fall in a sheet that is taller than one.
+ *
+ * Word decides most of its breaks by how the text happens to land, which needs a typesetter to
+ * reproduce. What can be said truthfully is where each page ends: at every page height down the
+ * sheet. So the boundaries are drawn there and numbered, and a paragraph may cross one — which is
+ * the difference between this and a typeset page, and better than a hundred pages drawn as one
+ * endless sheet.
+ */
+function PageBoundaries({ pageHeight }: { pageHeight: number }) {
+  const sheet = useRef<HTMLDivElement | null>(null);
+  const [howMany, setHowMany] = useState(0);
+
+  useEffect(() => {
+    const holder = sheet.current?.parentElement;
+    // The text, not the sheet. The markers are positioned down the sheet, so measuring the sheet
+    // measures them too: each one made it taller, which asked for another. A five-page document
+    // reported three hundred pages before this looked at the text instead.
+    const text = holder?.querySelector<HTMLElement>("[contenteditable], [data-p]")?.parentElement;
+    if (!holder || !text || pageHeight <= 0) return;
+
+    const measure = () => {
+      // Known only after the text has been laid out and the pictures have arrived, so it is
+      // measured rather than calculated.
+      const boundaries = Math.max(Math.ceil(text.scrollHeight / pageHeight) - 1, 0);
+      setHowMany(boundaries);
+    };
+    measure();
+
+    // Pictures loading and text reflowing both change where the pages fall.
+    const watching = new ResizeObserver(measure);
+    watching.observe(text);
+    return () => watching.disconnect();
+  }, [pageHeight]);
+
+  return (
+    <div ref={sheet} aria-hidden="true">
+      {Array.from({ length: howMany }, (_, index) => (
+        <div
+          key={index}
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: (index + 1) * pageHeight,
+            borderTop: "1px dashed #d5d0c7",
+            pointerEvents: "none",
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              right: 6,
+              top: 3,
+              fontSize: 10,
+              color: "var(--faint)",
+              background: "#fff",
+              padding: "0 4px",
+            }}
+          >
+            {t("doc.page")} {index + 2}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function pagesOf(html: string): string[] {
+  // Both kinds: the break the author inserted, and the one the word processor recorded where the
+  // page ended last time it laid the document out. The second is the useful one — it is how page 1
+  // here is page 1 as the author saw it — and it is in the file, not worked out from the text.
+  const pages = html
+    .split(/<hr class="page-break(?: rendered)?">/g)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  return pages.length > 0 ? pages : [html];
+}
+
+/** Whether the document says where its own pages end. */
+function saysWhereItsPagesEnd(html: string): boolean {
+  return html.includes('class="page-break');
 }
 
 export function DocumentWorkspace(
@@ -141,35 +233,102 @@ export function DocumentWorkspace(
         doc.problem ? (
           <div style={{ padding: 24, color: "var(--muted)", maxWidth: 460 }}>{doc.problem}</div>
         ) : (
-          <div
-            onClick={onCanvasClick}
-            style={{
-              background: "#fff",
-              border: "1px solid #dedad2",
-              boxShadow: "0 1px 4px rgba(0,0,0,.05)",
-              width: 560,
-              padding: "34px 44px",
-              fontSize: 12.5,
-              lineHeight: 1.7,
-              color: "#2b2823",
-              alignSelf: "flex-start",
-            }}
-          >
+          <div onClick={onCanvasClick} style={{ alignSelf: "flex-start" }}>
             {doc.model ? (
-              <div
-                // Typing here is the User's own change. The Core produced this markup from
-                // their file and marked every block, so a rewrite can say which paragraph it
-                // was without matching on the words.
-                contentEditable={Boolean(props.path)}
-                suppressContentEditableWarning
-                onBlur={(event) => {
-                  const block = (event.target as HTMLElement).closest("[data-p]");
-                  const raw = block?.getAttribute("data-p");
-                  const text = block?.textContent ?? "";
-                  if (raw !== null && raw !== undefined) rewrite(Number(raw), text);
-                }}
-                dangerouslySetInnerHTML={{ __html: withPictures(doc.model.html, props.path) }}
-              />
+              pagesOf(doc.model.html).map((page, index, all) => (
+                <div
+                  key={index}
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #dedad2",
+                    boxShadow: "0 1px 4px rgba(0,0,0,.05)",
+                    // The page as the document itself describes it, rather than a fixed
+                    // rectangle: a sheet of the file's own width, with the file's own margins.
+                    width: doc.model?.page?.width ?? 560,
+                    padding: `${doc.model?.page?.marginTop ?? 34}px ${
+                      doc.model?.page?.marginRight ?? 44
+                    }px ${doc.model?.page?.marginBottom ?? 34}px ${
+                      doc.model?.page?.marginLeft ?? 44
+                    }px`,
+                    minHeight: doc.model?.page?.height ?? undefined,
+                    fontSize: 12.5,
+                    lineHeight: 1.7,
+                    color: "#2b2823",
+                    // The gap is the page transition. One continuous sheet made a hundred-page
+                    // manuscript look like a single endless page.
+                    marginBottom: index === all.length - 1 ? 0 : 22,
+                    position: "relative",
+                  }}
+                >
+                  {doc.model?.headerHtml ? (
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        fontSize: 10.5,
+                        color: "var(--faint)",
+                        borderBottom: "1px solid #f1efea",
+                        paddingBottom: 6,
+                        marginBottom: 12,
+                      }}
+                      dangerouslySetInnerHTML={{ __html: doc.model.headerHtml }}
+                    />
+                  ) : null}
+                  <div
+                    // Typing here is the User's own change. The Core produced this markup from
+                    // their file and marked every block, so a rewrite can say which paragraph it
+                    // was without matching on the words.
+                    contentEditable={Boolean(props.path)}
+                    suppressContentEditableWarning
+                    onBlur={(event) => {
+                      const block = (event.target as HTMLElement).closest("[data-p]");
+                      const raw = block?.getAttribute("data-p");
+                      const text = block?.textContent ?? "";
+                      if (raw !== null && raw !== undefined) rewrite(Number(raw), text);
+                    }}
+                    dangerouslySetInnerHTML={{ __html: withPictures(page, props.path) }}
+                  />
+                  {doc.model?.footerHtml ? (
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        fontSize: 10.5,
+                        color: "var(--faint)",
+                        borderTop: "1px solid #f1efea",
+                        paddingTop: 6,
+                        marginTop: 12,
+                      }}
+                      dangerouslySetInnerHTML={{ __html: doc.model.footerHtml }}
+                    />
+                  ) : null}
+                  {/* Where the pages fall inside this sheet, for a document that declares no
+                      breaks of its own — most long ones do not. */}
+                  {/* Keyed by the document, so opening another one measures that one rather than
+                      keeping the last one's page count. */}
+                  {/* Only for a document that records nothing about its own pages — a file from a
+                      converter, say. Where the document says where its pages end, that is used
+                      instead and this would draw a second, disagreeing set of lines. */}
+                  {saysWhereItsPagesEnd(doc.model?.html ?? "") ? null : (
+                    <PageBoundaries
+                      key={`${props.path ?? ""}-${index}`}
+                      pageHeight={doc.model?.page?.height ?? 0}
+                    />
+                  )}
+                  {/* Which page this is, where the document has more than one. */}
+                  {all.length > 1 ? (
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: -17,
+                        right: 2,
+                        fontSize: 10.5,
+                        color: "var(--faint)",
+                      }}
+                    >
+                      {index + 1} / {all.length}
+                    </div>
+                  ) : null}
+                </div>
+              ))
             ) : (
               <div style={{ color: "var(--muted)" }}>{t("common.loading")}</div>
             )}
