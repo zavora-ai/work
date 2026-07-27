@@ -11,6 +11,8 @@ mod api;
 mod capabilities;
 mod intent;
 mod keeper;
+#[cfg(feature = "adk")]
+mod live;
 mod overview;
 mod presenting;
 mod standings;
@@ -23,6 +25,14 @@ use studio_store::Store;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Chosen here, once. Two providers are available and none is installed by default, so the first
+    // secure connection ends the process — which is what happened on opening a presenting session,
+    // and it took the whole Core with it rather than failing the one request.
+    #[cfg(feature = "adk")]
+    {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+
     let dir = std::env::var("ZWS_DATA_DIR").unwrap_or_else(|_| ".zws".to_string());
     std::fs::create_dir_all(&dir)?;
     let path = std::path::Path::new(&dir).join("studio.db");

@@ -10,7 +10,7 @@ publish.workspace = true
 default = []
 # Lets the Core actually do the work. Needs the ADK-Rust checkout beside this one, so it
 # is off by default and `make ci` does not require it.
-adk = ["dep:studio-runner", "studio-runner/adk", "dep:adk-model", "dep:adk-audio"]
+adk = ["dep:studio-runner", "studio-runner/adk", "dep:adk-model", "dep:adk-audio", "dep:adk-realtime", "dep:rustls"]
 
 [dependencies]
 axum.workspace = true
@@ -25,6 +25,12 @@ rusqlite.workspace = true
 studio-jobs.workspace = true
 studio-runner = { workspace = true, optional = true }
 adk-model = { path = "../../../../adk-rust/adk-model", optional = true, default-features = false, features = ["openai"] }
+# A session held open for as long as a deck is being presented, so what is being said can be cut
+# off when the presenter moves on and a question can be answered in the middle of it.
+adk-realtime = { path = "../../../../adk-rust/adk-realtime", optional = true, default-features = false, features = ["openai"] }
+# Named outright so one provider is chosen. With two available and none installed, the first secure
+# connection kills the process — which it did, on opening a presenting session.
+rustls = { version = "0.23", optional = true, default-features = false, features = ["ring"] }
 # The presenter's voice. Only with the engine, like everything else that reaches outward.
 adk-audio = { path = "../../../../adk-rust/adk-audio", optional = true, default-features = false, features = ["tts"] }
 studio-router.workspace = true

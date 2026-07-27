@@ -271,6 +271,13 @@ pub fn router(api: Arc<Api>) -> Router {
         // Presenting: what to say over each slide, and saying it.
         .route("/talk", get(talk))
         .route("/speak", axum::routing::post(speak))
+        // Presenting live: a session held open while the deck is up, so what is said can be cut
+        // off when the presenter moves on.
+        .route("/present/begin", axum::routing::post(present_begin))
+        .route("/present/say", axum::routing::post(present_say))
+        .route("/present/hush", axum::routing::post(present_hush))
+        .route("/present/end", axum::routing::post(present_end))
+        .route("/present/heard", get(present_heard))
         .route("/deck", get(deck))
         // Asking for a change. A POST because it changes the User's file.
         .route("/ask", axum::routing::post(ask))
@@ -1582,6 +1589,176 @@ pub struct DocumentQuery {
     /// one round trip is simpler than several.
     #[serde(default)]
     pub with_pictures: bool,
+}
+
+/// Open a live presenter for a deck.
+#[cfg(feature = "adk")]
+async fn present_begin(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<BeginRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let voice = body.voice.unwrap_or_else(|| "alloy".to_string());
+    match crate::live::begin(&voice, &body.about.unwrap_or_default()).await {
+        Ok(()) => Json(serde_json::json!({ "ready": true })).into_response(),
+        Err(detail) => problem(
+            "Work Studio could not start presenting".into(),
+            Some(&detail),
+        ),
+    }
+}
+
+/// Say a slide's words, cutting off whatever was being said.
+#[cfg(feature = "adk")]
+async fn present_say(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<SpeakRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(presenter) = crate::live::presenter().await else {
+        return problem("Nobody is presenting".into(), None);
+    };
+    match presenter.say(&body.words).await {
+        Ok(()) => Json(serde_json::json!({ "saying": true })).into_response(),
+        Err(detail) => problem("Work Studio could not say that".into(), Some(&detail)),
+    }
+}
+
+/// Stop talking, now — the presenter has moved on, or someone has a question.
+#[cfg(feature = "adk")]
+async fn present_hush(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match crate::live::presenter().await {
+        Some(presenter) => match presenter.hush().await {
+            Ok(()) => Json(serde_json::json!({ "quiet": true })).into_response(),
+            Err(detail) => problem("Work Studio could not stop".into(), Some(&detail)),
+        },
+        None => Json(serde_json::json!({ "quiet": true })).into_response(),
+    }
+}
+
+/// Take the deck down. Nothing keeps talking afterwards.
+#[cfg(feature = "adk")]
+async fn present_end(State(api): State<Arc<Api>>, headers: HeaderMap) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    crate::live::end().await;
+    Json(serde_json::json!({ "done": true })).into_response()
+}
+
+/// What the presenter has said since last asked: sound to play and the words to show.
+///
+/// Drained rather than streamed, because the interface asks as it plays and a socket held open for
+/// this would be a second channel doing what the first already does.
+#[cfg(feature = "adk")]
+async fn present_heard(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(presenter) = crate::live::presenter().await else {
+        return problem("Nobody is presenting".into(), None);
+    };
+
+    // Whatever has arrived, up to a mouthful. Waiting for the whole answer would make the
+    // presenter start a sentence behind.
+    let mut heard = Vec::new();
+    let mut finished = false;
+    for _ in 0..400 {
+        match tokio::time::timeout(std::time::Duration::from_millis(300), presenter.next()).await {
+            // Housekeeping. Skipped without giving up on the session, which is the difference
+            // between hearing the presenter and stopping at "session created".
+            Ok(Some(crate::live::Heard::Nothing)) => continue,
+            Ok(Some(crate::live::Heard::Finished)) => {
+                heard.push(crate::live::Heard::Finished);
+                finished = true;
+                break;
+            }
+            Ok(Some(one)) => heard.push(one),
+            // The session has ended, or nothing has come for a moment — the presenter pauses
+            // between sentences, and that is not a fault.
+            Ok(None) | Err(_) => break,
+        }
+    }
+    let _ = finished;
+    Json(serde_json::json!({ "heard": heard })).into_response()
+}
+
+/// Without the sibling checkouts there is nothing to present with, and the interface is told so
+/// plainly rather than left waiting for a voice that will not come.
+#[cfg(not(feature = "adk"))]
+mod not_presenting {
+    use super::*;
+
+    pub(super) async fn present_begin(
+        State(api): State<Arc<Api>>,
+        headers: HeaderMap,
+        Json(_body): Json<BeginRequest>,
+    ) -> axum::response::Response {
+        refuse(&api, &headers)
+    }
+
+    pub(super) async fn present_say(
+        State(api): State<Arc<Api>>,
+        headers: HeaderMap,
+        Json(_body): Json<SpeakRequest>,
+    ) -> axum::response::Response {
+        refuse(&api, &headers)
+    }
+
+    pub(super) async fn present_hush(
+        State(api): State<Arc<Api>>,
+        headers: HeaderMap,
+    ) -> axum::response::Response {
+        refuse(&api, &headers)
+    }
+
+    pub(super) async fn present_end(
+        State(api): State<Arc<Api>>,
+        headers: HeaderMap,
+    ) -> axum::response::Response {
+        refuse(&api, &headers)
+    }
+
+    pub(super) async fn present_heard(
+        State(api): State<Arc<Api>>,
+        headers: HeaderMap,
+    ) -> axum::response::Response {
+        refuse(&api, &headers)
+    }
+
+    fn refuse(api: &Arc<Api>, headers: &HeaderMap) -> axum::response::Response {
+        if !api.authorised(headers) {
+            return (StatusCode::UNAUTHORIZED, "").into_response();
+        }
+        problem(
+            "Work Studio has not been set up to present aloud yet".into(),
+            None,
+        )
+    }
+}
+
+#[cfg(not(feature = "adk"))]
+use not_presenting::{present_begin, present_end, present_heard, present_hush, present_say};
+
+#[derive(Debug, Deserialize)]
+pub struct BeginRequest {
+    #[serde(default)]
+    pub voice: Option<String>,
+    /// What the deck is about, so the presenter knows what it is presenting.
+    #[serde(default)]
+    pub about: Option<String>,
 }
 
 /// What to say over each slide of a deck.
