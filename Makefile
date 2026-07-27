@@ -16,7 +16,10 @@ core-test: ## Run the Core tests
 	cd $(CORE) && cargo test --workspace
 
 shell-test: ## Run the Shell tests, including the handshake against the real Core
-	cd $(CORE) && cargo build -q -p studio-core
+# Built with the engine, because that is the Core the app runs. Building it without leaves the same
+# path holding a binary that cannot think, edit or speak — and the app says so in the User's words,
+# which reads as a broken product rather than a build that was never asked for the engine.
+	cd $(CORE) && cargo build -q -p studio-core --features adk
 	cd $(SHELL_DIR) && npm run typecheck && npm test
 
 lint: ## Run the vocabulary guardrail (Requirement 1.2)

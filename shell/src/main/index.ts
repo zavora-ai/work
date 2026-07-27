@@ -10,7 +10,17 @@
  *   holds the credential.
  */
 
-import { app, BrowserWindow, dialog, ipcMain, net, protocol, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  net,
+  protocol,
+  session,
+  shell,
+  systemPreferences,
+} from "electron";
 import { join } from "node:path";
 
 import {
@@ -83,6 +93,36 @@ function servePictures(): void {
       headers: { Authorization: `Bearer ${core.token}` },
     });
   });
+}
+
+/**
+ * What the window may ask the machine for.
+ *
+ * The microphone, and nothing else. Without this the window is refused by default and a presenter
+ * holding the ask button is told Work Studio cannot hear them — which is true and not the answer
+ * anyone wants. Everything else is still refused, because a renderer that can ask for the camera or
+ * the screen is a renderer that can be talked into it.
+ */
+function decideWhatTheWindowMayUse(): void {
+  session.defaultSession.setPermissionRequestHandler(async (_contents, permission, allow) => {
+    // On macOS the window's permission is not the whole story: the system decides too, and asks the
+    // User itself the first time. Without this the microphone is refused with no prompt and no
+    // explanation, which looks like the product being broken.
+    if (permission === "media" && process.platform === "darwin") {
+      const already = systemPreferences.getMediaAccessStatus("microphone");
+      if (already !== "granted") {
+        const granted = await systemPreferences.askForMediaAccess("microphone");
+        allow(granted);
+        return;
+      }
+    }
+    // "media" covers the microphone here. Named once, so widening what the window may ask for is a
+    // change to this line and shows up in a diff.
+    allow(permission === "media");
+  });
+  session.defaultSession.setPermissionCheckHandler(
+    (_contents, permission) => permission === "media",
+  );
 }
 
 function applyContentSecurityPolicy(): void {
@@ -169,6 +209,7 @@ protocol.registerSchemesAsPrivileged([
 
 app.whenReady().then(async () => {
   applyContentSecurityPolicy();
+  decideWhatTheWindowMayUse();
   servePictures();
 
   ipcMain.handle("core:health", () => coreFetch("/health"));
@@ -236,6 +277,14 @@ app.whenReady().then(async () => {
   // Presenting live. The session is the Core's; this only carries the asking and the answers.
   ipcMain.handle("core:presentBegin", (_event, body: unknown) => corePost("/present/begin", body));
   ipcMain.handle("core:presentSay", (_event, body: unknown) => corePost("/present/say", body));
+  // What the system says about the microphone, so the interface can tell the User whether the
+  // answer is "not yet asked", "refused" or "there isn't one".
+  ipcMain.handle("shell:microphone", () =>
+    process.platform === "darwin"
+      ? systemPreferences.getMediaAccessStatus("microphone")
+      : "unknown",
+  );
+
   ipcMain.handle("core:presentAsk", (_event, body: unknown) => corePost("/present/ask", body));
   ipcMain.handle("core:presentHush", () => corePost("/present/hush", {}));
   ipcMain.handle("core:presentEnd", () => corePost("/present/end", {}));

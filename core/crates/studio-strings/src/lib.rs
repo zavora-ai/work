@@ -150,6 +150,16 @@ pub const CATALOGUE: &[Entry] = &[
     p("present.ask", "Ask it something"),
     p("present.ask_placeholder", "What would you like to ask?"),
     p("present.put_it", "Ask"),
+    p("present.hold_to_ask", "Hold to ask"),
+    p("present.listening", "Listening…"),
+    p(
+        "present.no_microphone",
+        "There is no microphone on this machine, so nothing can be asked out loud.",
+    ),
+    p(
+        "present.microphone_refused",
+        "Work Studio has not been allowed to hear you.",
+    ),
     p("deck.present", "Present"),
     p("sheet.rename", "Rename this sheet"),
     p("sheet.delete", "Delete this sheet"),

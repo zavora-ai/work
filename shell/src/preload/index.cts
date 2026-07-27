@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld("studio", {
   presentBegin: (body: { voice?: string; about?: string }) =>
     ipcRenderer.invoke("core:presentBegin", body),
   presentSay: (body: { words: string }) => ipcRenderer.invoke("core:presentSay", body),
+  microphone: () => ipcRenderer.invoke("shell:microphone"),
   presentAsk: (body: { question?: string; spoken?: string }) =>
     ipcRenderer.invoke("core:presentAsk", body),
   presentHush: () => ipcRenderer.invoke("core:presentHush"),

@@ -14,7 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { t } from "../../shared/strings.ts";
 import { bridge } from "../useOwn.ts";
-import { SpeechPlayer } from "../speech.ts";
+import { QuestionListener, SpeechPlayer } from "../speech.ts";
 
 export interface PresentableSlide {
   number: number;
@@ -48,6 +48,12 @@ export function Presenting({
   // a room full of people picks up the room.
   const [asking, setAsking] = useState(false);
   const [question, setQuestion] = useState("");
+  // A question asked out loud. The microphone is open only while the button is held, because a
+  // microphone in a room full of people picks up the room.
+  const listener = useRef<QuestionListener | undefined>(undefined);
+  const [listeningForQuestion, setListeningForQuestion] = useState(false);
+  const [cannotHear, setCannotHear] = useState<"no device" | "refused" | undefined>();
+
 
   // The presenter is a session held open by the Core while the deck is up. Sound arrives in pieces
   // and is queued as it comes, so the voice keeps up with the slide.
@@ -122,6 +128,30 @@ export function Presenting({
     },
     [listen, talk],
   );
+
+  const startListening = useCallback(async () => {
+    listener.current = new QuestionListener();
+    const outcome = await listener.current.start();
+    if (outcome !== "listening") {
+      setCannotHear(outcome);
+      listener.current = undefined;
+      return;
+    }
+    setCannotHear(undefined);
+    player.current?.stop();
+    setSaying("");
+    setListeningForQuestion(true);
+  }, []);
+
+  const stopListening = useCallback(async () => {
+    if (!listener.current) return;
+    const spoken = listener.current.stop();
+    listener.current = undefined;
+    setListeningForQuestion(false);
+    if (spoken.length < 1000) return; // barely a moment; nothing was asked
+    await bridge()?.presentAsk?.({ spoken });
+    void listen();
+  }, [listen]);
 
   // The keys a presenter's hands already know. On the window rather than on an element, because a
   // presenter is looking at the slide and not at whatever happens to hold the focus — losing this
@@ -328,6 +358,31 @@ export function Presenting({
           <button type="button" onClick={() => setAsking((open) => !open)} style={dark}>
             {t("present.ask")}
           </button>
+        ) : null}
+        {aloud ? (
+          <button
+            type="button"
+            // Held, not toggled: the microphone is open while a hand is on it and shut the moment
+            // it is not, which is the only arrangement a presenter can trust in a full room.
+            onMouseDown={() => void startListening()}
+            onMouseUp={() => void stopListening()}
+            onMouseLeave={() => void stopListening()}
+            aria-pressed={listeningForQuestion}
+            style={{
+              ...dark,
+              borderColor: listeningForQuestion ? "#8c6f4a" : "#33302a",
+              color: listeningForQuestion ? "#e8c99a" : "#d9d5cd",
+            }}
+          >
+            {listeningForQuestion ? t("present.listening") : t("present.hold_to_ask")}
+          </button>
+        ) : null}
+        {cannotHear ? (
+          <span style={{ color: "#a29d94" }}>
+            {cannotHear === "no device"
+              ? t("present.no_microphone")
+              : t("present.microphone_refused")}
+          </span>
         ) : null}
         {talk && talk.length > 0 ? (
           <button

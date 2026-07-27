@@ -84,6 +84,9 @@ export interface StudioBridge {
    */
   presentBegin(body: { voice?: string; about?: string }): Promise<unknown>;
   presentSay(body: { words: string }): Promise<unknown>;
+  /** What the machine says about the microphone: granted, denied, not-determined. */
+  microphone(): Promise<unknown>;
+
   /** Put a question to the presenter, in words or in speech. Both interrupt. */
   presentAsk(body: { question?: string; spoken?: string }): Promise<unknown>;
   presentHush(): Promise<unknown>;

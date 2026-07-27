@@ -95,3 +95,92 @@ function decode(base64: string): Int16Array {
   // An odd byte cannot be half a sample; the remainder is left rather than guessed at.
   return new Int16Array(bytes.buffer, 0, Math.floor(bytes.length / 2));
 }
+
+/**
+ * Listening for a question.
+ *
+ * Held open while the presenter's hand is on the button and closed the moment it is not: a
+ * microphone in a room full of people picks up the room, so it is on only while someone means it to
+ * be. What comes back is the samples the session expects — signed 16-bit at 24kHz — and nothing is
+ * kept afterwards.
+ */
+export class QuestionListener {
+  private context: AudioContext | undefined;
+  private stream: MediaStream | undefined;
+  private node: ScriptProcessorNode | undefined;
+  private collected: Int16Array[] = [];
+
+  /**
+   * Start listening.
+   *
+   * Answers why it could not, rather than only that it could not: "there is no microphone on this
+   * machine" and "you have refused this one" are different problems with different answers, and a
+   * presenter told the wrong one goes looking in the wrong place. This machine, for instance, has
+   * speakers and no input device at all.
+   */
+  async start(): Promise<"listening" | "no device" | "refused"> {
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (trouble) {
+      const name = (trouble as { name?: string })?.name ?? "";
+      return name === "NotFoundError" || name === "OverconstrainedError"
+        ? "no device"
+        : "refused";
+    }
+
+    this.context = new AudioContext({ sampleRate: SAMPLE_RATE });
+    const source = this.context.createMediaStreamSource(this.stream);
+    // 4096 samples is about a sixth of a second: small enough to feel immediate, large enough not
+    // to spend the whole time in callbacks.
+    this.node = this.context.createScriptProcessor(4096, 1, 1);
+    this.node.onaudioprocess = (event) => {
+      const input = event.inputBuffer.getChannelData(0);
+      const samples = new Int16Array(input.length);
+      for (let at = 0; at < input.length; at += 1) {
+        // Clamped, because a loud room can push a sample past the range and wrapping it would be
+        // heard as a crack.
+        const value = Math.max(-1, Math.min(1, input[at]!));
+        samples[at] = value < 0 ? value * 32768 : value * 32767;
+      }
+      this.collected.push(samples);
+    };
+    source.connect(this.node);
+    // Connected to the output because some engines will not run a processor that goes nowhere. The
+    // gain is zero, so the room does not hear itself.
+    const silence = this.context.createGain();
+    silence.gain.value = 0;
+    this.node.connect(silence);
+    silence.connect(this.context.destination);
+    return "listening";
+  }
+
+  /** Stop listening and hand over what was said, as base64 samples. */
+  stop(): string {
+    this.node?.disconnect();
+    this.node = undefined;
+    for (const track of this.stream?.getTracks() ?? []) track.stop();
+    this.stream = undefined;
+    void this.context?.close();
+    this.context = undefined;
+
+    const total = this.collected.reduce((sum, part) => sum + part.length, 0);
+    const all = new Int16Array(total);
+    let at = 0;
+    for (const part of this.collected) {
+      all.set(part, at);
+      at += part.length;
+    }
+    this.collected = [];
+    return encode(new Uint8Array(all.buffer, 0, all.length * 2));
+  }
+}
+
+/** Bytes as base64, for a channel that carries text. */
+function encode(bytes: Uint8Array): string {
+  let binary = "";
+  // In pieces, because a single call with a hundred thousand arguments overflows the stack.
+  for (let at = 0; at < bytes.length; at += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(at, at + 8192));
+  }
+  return btoa(binary);
+}
