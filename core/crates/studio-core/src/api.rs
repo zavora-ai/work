@@ -267,6 +267,7 @@ pub fn router(api: Arc<Api>) -> Router {
         // of what the file contains.
         .route("/sheet", get(sheet))
         .route("/document", get(document))
+        .route("/media", get(media))
         .route("/deck", get(deck))
         // Asking for a change. A POST because it changes the User's file.
         .route("/ask", axum::routing::post(ask))
@@ -1535,7 +1536,90 @@ async fn ask(
         .into_response()
 }
 
-artefact_route!(document, studio_docs::read);
+/// The document. Its pictures are referenced rather than carried unless the caller asks otherwise.
+///
+/// Inlining every image turns a 200MB manuscript into a 290MB payload, which has to cross the
+/// channel, be parsed and become a page — measured at 288MB against a real document, where the
+/// referencing version of the same file is 932KB. The pictures come from `/media`, one at a time,
+/// as the page asks for them.
+async fn document(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Query(query): Query<DocumentQuery>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let path = std::path::Path::new(&query.path);
+    let read = if query.with_pictures {
+        studio_docs::read(path)
+    } else {
+        studio_docs::read_referencing_images(path)
+    };
+    match read {
+        Ok(model) => Json(model).into_response(),
+        Err(error) => {
+            if let Some(detail) = error.detail() {
+                tracing_detail(detail);
+            }
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Json(serde_json::json!({ "problem": error.to_string() })),
+            )
+                .into_response()
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentQuery {
+    pub path: String,
+    /// Carry the pictures in the answer instead of referencing them. For a small document where
+    /// one round trip is simpler than several.
+    #[serde(default)]
+    pub with_pictures: bool,
+}
+
+/// One picture from a document, by the identifier the view referenced it with.
+async fn media(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Query(query): Query<MediaQuery>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match studio_docs::media(std::path::Path::new(&query.path), &query.id) {
+        Ok((kind, bytes)) => (
+            StatusCode::OK,
+            [
+                (axum::http::header::CONTENT_TYPE, kind),
+                // A picture inside a document does not change without the document changing, and
+                // the interface asks for the same ones every time it redraws.
+                (
+                    axum::http::header::CACHE_CONTROL,
+                    "private, max-age=3600".to_string(),
+                ),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(error) => {
+            if let Some(detail) = error.detail() {
+                tracing_detail(detail);
+            }
+            (StatusCode::NOT_FOUND, "").into_response()
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MediaQuery {
+    pub path: String,
+    /// The relationship id, as the view emitted it in `data-media`.
+    pub id: String,
+}
 artefact_route!(deck, studio_decks::read);
 
 async fn sheet(

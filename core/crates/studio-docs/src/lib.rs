@@ -80,12 +80,40 @@ pub struct DocModel {
 }
 
 /// Read a document into a model the interface can draw and edit.
+/// The document, with its pictures referenced rather than carried.
+///
+/// For anything but a small file this is the only version an interface can actually hold: inlining
+/// the images turns a 200MB manuscript into a 290MB payload, which has to cross the channel, be
+/// parsed, and become a page. The pictures are fetched one at a time instead, by the identifier in
+/// each `<img data-media>`.
+pub fn read_referencing_images(path: &std::path::Path) -> Result<DocModel> {
+    read_with(path, false)
+}
+
+/// One embedded picture from a document.
+pub fn media(path: &std::path::Path, embed_id: &str) -> Result<(String, Vec<u8>)> {
+    let document = Document::open(path).map_err(|e| DocError::Open {
+        detail: e.to_string(),
+    })?;
+    document.media(embed_id).ok_or(DocError::Open {
+        detail: format!("no image {embed_id} in this document"),
+    })
+}
+
 pub fn read(path: &std::path::Path) -> Result<DocModel> {
+    read_with(path, true)
+}
+
+fn read_with(path: &std::path::Path, inline_images: bool) -> Result<DocModel> {
     let document = Document::open(path).map_err(|e| DocError::Open {
         detail: e.to_string(),
     })?;
 
-    let html = document.to_editable_html();
+    let html = if inline_images {
+        document.to_editable_html()
+    } else {
+        document.to_editable_html_referencing_images()
+    };
     let layout = document.page_layout();
 
     Ok(DocModel {
