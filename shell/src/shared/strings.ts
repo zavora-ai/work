@@ -145,6 +145,8 @@ export const CATALOGUE = {
   "present.forward": p("On a slide"),
   "present.notes": p("Your notes"),
   "present.leave": p("Stop presenting"),
+  "present.talk": p("Let it present"),
+  "present.stop_talking": p("Stop talking"),
   "deck.present": p("Present"),
   "sheet.rename": p("Rename this sheet"),
   "sheet.delete": p("Delete this sheet"),

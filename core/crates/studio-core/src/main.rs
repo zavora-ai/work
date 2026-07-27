@@ -12,8 +12,11 @@ mod capabilities;
 mod intent;
 mod keeper;
 mod overview;
+mod presenting;
 mod standings;
 mod trays;
+#[cfg(feature = "adk")]
+mod voice;
 
 use studio_jobs::{Job, JobKind, JobState};
 use studio_store::Store;

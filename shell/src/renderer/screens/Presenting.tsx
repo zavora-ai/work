@@ -10,9 +10,10 @@
  * to come back, and the mouse only where a hand might reach for it.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { t } from "../../shared/strings.ts";
+import { bridge } from "../useOwn.ts";
 
 export interface PresentableSlide {
   number: number;
@@ -25,20 +26,62 @@ export function Presenting({
   slides,
   startAt = 0,
   onLeave,
-  /** What the agent is saying now, where an agent is doing the talking. */
-  saying,
-  /** Ask the agent to speak this slide. Absent when nobody is presenting but the User. */
-  onSpeak,
+  talk,
 }: {
   slides: PresentableSlide[];
   startAt?: number;
   onLeave: () => void;
-  saying?: string;
-  onSpeak?: (slide: PresentableSlide) => void;
+  /**
+   * What to say over each slide: the deck's own notes where it has them, and the slide read as it
+   * stands where it does not. Absent when the deck is being presented by the User alone.
+   */
+  talk?: { slide: number; words: string; fromTheDeck: boolean }[];
 }) {
   const [at, setAt] = useState(Math.min(Math.max(startAt, 0), Math.max(slides.length - 1, 0)));
   // The notes are the presenter's, not the audience's. Off unless asked for.
   const [showNotes, setShowNotes] = useState(false);
+  // Whether the presenting is being done aloud, and what is being said now.
+  const [aloud, setAloud] = useState(false);
+  const [saying, setSaying] = useState<string | undefined>();
+  const playing = useRef<HTMLAudioElement | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+
+  const stopTalking = useCallback(() => {
+    playing.current?.pause();
+    playing.current = null;
+    setSaying(undefined);
+    setSpeaking(false);
+  }, []);
+
+  /** Say the words for a slide, stopping whatever was being said. */
+  const say = useCallback(
+    async (slideNumber: number) => {
+      const words = talk?.find((one) => one.slide === slideNumber)?.words;
+      if (!words) {
+        setSaying(undefined);
+        return;
+      }
+      stopTalking();
+      setSaying(words);
+      const answer = (await bridge()?.speak?.({ words })) as
+        | { wav?: string; problem?: string }
+        | undefined;
+      if (!answer?.wav) {
+        // Said on screen even when it cannot be said aloud, so a presenter is not left with a
+        // silent slide and no idea why.
+        return;
+      }
+      const sound = new Audio(`data:audio/wav;base64,${answer.wav}`);
+      playing.current = sound;
+      // Recorded on the surface so it can be seen from outside that the words are being said and
+      // not merely shown — a silent presentation that claims to be talking is the failure worth
+      // catching.
+      sound.addEventListener("playing", () => setSpeaking(true));
+      sound.addEventListener("ended", () => setSpeaking(false));
+      void sound.play().catch(() => setSpeaking(false));
+    },
+    [stopTalking, talk],
+  );
 
   const go = useCallback(
     (by: number) => {
@@ -90,11 +133,15 @@ export function Presenting({
 
   const slide = slides[at];
 
-  // Asking the agent to speak happens on arriving at a slide, not on every redraw, or it would
-  // start again each time the notes were shown.
+  // Said on arriving at a slide, not on every redraw, or it would start again each time the notes
+  // were shown.
   useEffect(() => {
-    if (slide && onSpeak) onSpeak(slide);
-  }, [at, onSpeak, slide]);
+    if (!aloud || !slide) return;
+    void say(slide.number);
+  }, [aloud, at, say, slide]);
+
+  // Nothing keeps talking after the presenting stops.
+  useEffect(() => stopTalking, [stopTalking]);
 
   if (!slide) {
     return (
@@ -105,7 +152,12 @@ export function Presenting({
   }
 
   return (
-    <div style={backdrop} role="region" aria-label={t("present.heading")}>
+    <div
+      style={backdrop}
+      role="region"
+      aria-label={t("present.heading")}
+      data-speaking={speaking ? "yes" : "no"}
+    >
       {/* The slide, as large as it will go while keeping its shape. */}
       <div
         style={{
@@ -186,7 +238,31 @@ export function Presenting({
             {t("present.notes")}
           </button>
         ) : null}
-        <button type="button" onClick={onLeave} style={{ ...dark, marginLeft: "auto" }}>
+        {talk && talk.length > 0 ? (
+          <button
+            type="button"
+            aria-pressed={aloud}
+            onClick={() => {
+              if (aloud) {
+                setAloud(false);
+                stopTalking();
+              } else {
+                setAloud(true);
+              }
+            }}
+            style={dark}
+          >
+            {aloud ? t("present.stop_talking") : t("present.talk")}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => {
+            stopTalking();
+            onLeave();
+          }}
+          style={{ ...dark, marginLeft: "auto" }}
+        >
           {t("present.leave")}
         </button>
       </div>

@@ -10,7 +10,7 @@ publish.workspace = true
 default = []
 # Lets the Core actually do the work. Needs the ADK-Rust checkout beside this one, so it
 # is off by default and `make ci` does not require it.
-adk = ["dep:studio-runner", "studio-runner/adk", "dep:adk-model"]
+adk = ["dep:studio-runner", "studio-runner/adk", "dep:adk-model", "dep:adk-audio"]
 
 [dependencies]
 axum.workspace = true
@@ -25,6 +25,8 @@ rusqlite.workspace = true
 studio-jobs.workspace = true
 studio-runner = { workspace = true, optional = true }
 adk-model = { path = "../../../../adk-rust/adk-model", optional = true, default-features = false, features = ["openai"] }
+# The presenter's voice. Only with the engine, like everything else that reaches outward.
+adk-audio = { path = "../../../../adk-rust/adk-audio", optional = true, default-features = false, features = ["tts"] }
 studio-router.workspace = true
 studio-tray.workspace = true
 studio-sheets.workspace = true

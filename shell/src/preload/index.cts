@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld("studio", {
   }) => ipcRenderer.invoke("core:addCapability", body),
   capabilityAction: (body: { id: string; action: string; agents?: string[] }) =>
     ipcRenderer.invoke("core:capabilityAction", body),
+  talk: (path: string) => ipcRenderer.invoke("core:talk", path),
+  speak: (body: { words: string; voice?: string }) => ipcRenderer.invoke("core:speak", body),
   sheetAct: (body: Record<string, unknown>) => ipcRenderer.invoke("core:sheetAct", body),
   redo: (body: { path: string; thread?: string }) => ipcRenderer.invoke("core:redo", body),
   undo: (body: { path: string; thread?: string }) => ipcRenderer.invoke("core:undo", body),

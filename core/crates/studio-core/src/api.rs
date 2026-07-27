@@ -268,6 +268,9 @@ pub fn router(api: Arc<Api>) -> Router {
         .route("/sheet", get(sheet))
         .route("/document", get(document))
         .route("/media", get(media))
+        // Presenting: what to say over each slide, and saying it.
+        .route("/talk", get(talk))
+        .route("/speak", axum::routing::post(speak))
         .route("/deck", get(deck))
         // Asking for a change. A POST because it changes the User's file.
         .route("/ask", axum::routing::post(ask))
@@ -1579,6 +1582,81 @@ pub struct DocumentQuery {
     /// one round trip is simpler than several.
     #[serde(default)]
     pub with_pictures: bool,
+}
+
+/// What to say over each slide of a deck.
+///
+/// The deck's own notes where it has them, and the slide read as it stands where it does not —
+/// each marked as which, because one is what the User wrote and the other is a suggestion.
+async fn talk(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Query(query): Query<PathQuery>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    match studio_decks::read(std::path::Path::new(&query.path)) {
+        Ok(model) => {
+            let talk = crate::presenting::talk_for(&model);
+            Json(serde_json::json!({ "talk": talk })).into_response()
+        }
+        Err(error) => problem(error.to_string(), error.detail()),
+    }
+}
+
+/// Say something aloud.
+///
+/// Answers with a playable file rather than samples, so the interface plays it and does not have to
+/// know what a sample rate is. The sound is made here and handed straight over: nothing about the
+/// User's deck is left anywhere it could be found again.
+#[cfg(feature = "adk")]
+async fn speak(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<SpeakRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let voice = body.voice.unwrap_or_else(|| "alloy".to_string());
+    match crate::voice::speak(&body.words, &voice).await {
+        Ok(spoken) => (
+            StatusCode::OK,
+            [
+                (axum::http::header::CONTENT_TYPE, "audio/wav".to_string()),
+                (
+                    axum::http::header::HeaderName::from_static("x-lasts-ms"),
+                    spoken.milliseconds.to_string(),
+                ),
+                // Never stored: a recording of the User's own words is theirs and nobody else's.
+                (axum::http::header::CACHE_CONTROL, "no-store".to_string()),
+            ],
+            spoken.wav,
+        )
+            .into_response(),
+        Err(detail) => problem("Work Studio could not say that".into(), Some(&detail)),
+    }
+}
+
+#[cfg(not(feature = "adk"))]
+async fn speak(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(_body): Json<SpeakRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    problem("Work Studio has not been set up to speak yet".into(), None)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SpeakRequest {
+    pub words: String,
+    /// Which voice. One is chosen when the caller does not care.
+    #[serde(default)]
+    pub voice: Option<String>,
 }
 
 /// One picture from a document, by the identifier the view referenced it with.

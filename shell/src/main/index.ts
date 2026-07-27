@@ -98,6 +98,9 @@ function applyContentSecurityPolicy(): void {
           // `zws-media:` is this process serving the pictures inside the User's document. Still
           // no remote origin: the scheme resolves to the Core on loopback.
           "img-src 'self' data: zws-media:",
+          // The presenter's own voice, made by the Core and handed straight to the window. Still
+          // nothing remote: the sound arrives as bytes in the answer, not as a URL to fetch.
+          "media-src 'self' data:",
           "font-src 'self'",
           // The renderer never talks to the network. It talks to the bridge.
           "connect-src 'none'",
@@ -207,6 +210,29 @@ app.whenReady().then(async () => {
   );
 
   ipcMain.handle("core:edit", (_event, body: unknown) => corePost("/edit", body));
+  // Presenting aloud. The audio comes back as bytes rather than a URL, because a recording of the
+  // User's own words should not be addressable by anything else on the machine.
+  ipcMain.handle("core:talk", (_event, path: string) =>
+    coreFetch(`/talk?path=${encodeURIComponent(path)}`),
+  );
+  ipcMain.handle("core:speak", async (_event, body: unknown) => {
+    if (!core) throw new Error("the Core is not running");
+    const answer = await fetch(`http://127.0.0.1:${core.port}/speak`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${core.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!answer.ok) return { problem: await answer.text() };
+    const sound = await answer.arrayBuffer();
+    return {
+      wav: Buffer.from(sound).toString("base64"),
+      lastsMs: Number(answer.headers.get("x-lasts-ms") ?? 0),
+    };
+  });
+
   ipcMain.handle("core:sheetAct", (_event, body: unknown) => corePost("/sheet/act", body));
   ipcMain.handle("core:redo", (_event, body: unknown) => corePost("/redo", body));
   ipcMain.handle("core:undo", (_event, body: unknown) => corePost("/undo", body));

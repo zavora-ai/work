@@ -145,6 +145,8 @@ pub const CATALOGUE: &[Entry] = &[
     p("present.forward", "On a slide"),
     p("present.notes", "Your notes"),
     p("present.leave", "Stop presenting"),
+    p("present.talk", "Let it present"),
+    p("present.stop_talking", "Stop talking"),
     p("deck.present", "Present"),
     p("sheet.rename", "Rename this sheet"),
     p("sheet.delete", "Delete this sheet"),

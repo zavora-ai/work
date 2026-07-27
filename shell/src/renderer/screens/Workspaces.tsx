@@ -16,7 +16,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useSheet } from "../useSheet.ts";
 import type { DeckState, DocumentState } from "../useArtefact.ts";
 import { useAsk, type Turn } from "../useAsk.ts";
-import { useSteering } from "../useOwn.ts";
+import { bridge, useSteering } from "../useOwn.ts";
 import { SteeringPanel } from "../components/SteeringPanel.tsx";
 import { t } from "../../shared/strings.ts";
 import { Presenting } from "./Presenting.tsx";
@@ -796,6 +796,21 @@ export function DeckWorkspace(
   // Presenting takes over the screen, so it is a state of this workspace rather than a route: the
   // deck being presented is the deck that was open.
   const [presenting, setPresenting] = useState(false);
+  // What to say over each slide, fetched when presenting begins rather than on opening the deck:
+  // reading a deck should not cost a round trip nobody asked for.
+  const [talk, setTalk] = useState<
+    { slide: number; words: string; fromTheDeck: boolean }[] | undefined
+  >();
+
+  useEffect(() => {
+    if (!presenting || !props.path || talk) return;
+    void (async () => {
+      const answer = (await bridge()?.talk?.(props.path!)) as
+        | { talk?: { slide: number; words: string; fromTheDeck: boolean }[] }
+        | undefined;
+      setTalk(answer?.talk ?? []);
+    })();
+  }, [presenting, props.path, talk]);
 
   // A click on the drawing tells us which element it was and, because the Core recorded
   // what each one came from, what could actually be changed.
@@ -819,6 +834,7 @@ export function DeckWorkspace(
       <Presenting
         slides={slides}
         startAt={active}
+        talk={talk}
         onLeave={() => setPresenting(false)}
       />
     );

@@ -78,6 +78,11 @@ export interface StudioBridge {
    *
    * Goes the same way an agent's change does, so one history holds both.
    */
+  /** What to say over each slide of a deck. */
+  talk(path: string): Promise<unknown>;
+  /** Say something aloud. Answers with the sound itself, not a link to it. */
+  speak(body: { words: string; voice?: string }): Promise<unknown>;
+
   /**
    * Do something to the sheet itself: insert or delete rows and columns, sort, freeze, merge,
    * fit the columns. A closed set of named actions, not a way to send any operation through.
