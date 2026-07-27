@@ -30,6 +30,7 @@ pub const MIGRATIONS: &[(&str, &str)] = &[
         include_str!("../migrations/0004_run_specialist.sql"),
     ),
     ("0005_undo", include_str!("../migrations/0005_undo.sql")),
+    ("0006_redo", include_str!("../migrations/0006_redo.sql")),
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -174,6 +175,7 @@ mod tests {
             "0003_capabilities",
             "0004_run_specialist",
             "0005_undo",
+            "0006_redo",
         ];
         assert_eq!(s.applied_migrations().unwrap(), expected);
         s.migrate().expect("re-running migrations is a no-op");

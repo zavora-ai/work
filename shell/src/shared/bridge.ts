@@ -84,6 +84,9 @@ export interface StudioBridge {
    */
   sheetAct(body: Record<string, unknown>): Promise<unknown>;
 
+  /** Put an undone change forward again. */
+  redo(body: { path: string; thread?: string }): Promise<unknown>;
+
   /** Put the last change to this file back. */
   undo(body: { path: string; thread?: string }): Promise<unknown>;
 

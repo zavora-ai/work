@@ -258,23 +258,33 @@ pub fn read(path: &std::path::Path, window: Window) -> Result<GridModel> {
 fn read_sheet(worksheet: &zavora_xlsx::Worksheet, window: Window) -> Sheet {
     let name = worksheet.name().to_string();
     let frozen = worksheet.frozen_at();
-    let Some((first_row, first_col, last_row, last_col)) = worksheet.used_range() else {
-        return Sheet {
-            name,
-            first_row: 0,
-            first_col: 0,
-            rows: Vec::new(),
-            merges: Vec::new(),
-            column_widths: Vec::new(),
-            // Filled in a second pass, once every sheet has been read.
-            charts: Vec::new(),
-            frozen_row: 0,
-            frozen_col: 0,
-        };
+    // Every sheet starts at A1, whatever the used range says.
+    //
+    // Reading from the used range meant a file whose data begins at row 5 was drawn as a sheet
+    // with no rows 1 to 4 — the User could not click A1, could not put a heading above their
+    // table, and saw a spreadsheet apparently missing its own top. A spreadsheet always opens at
+    // A1; where the data happens to start is not where the sheet starts.
+    let (first_row, first_col) = (0u32, 0u16);
+
+    // And it goes on past the data, because a sheet you cannot type below is a sheet you cannot
+    // add to. Enough to fill the pane and then some, which is what the blank space in any
+    // spreadsheet is for.
+    const ROOM_BELOW: u32 = 24;
+    const ROOM_RIGHT: u16 = 4;
+
+    let (used_last_row, used_last_col) = match worksheet.used_range() {
+        Some((_, _, last_row, last_col)) => (last_row, last_col),
+        // Nothing in it yet. Still a sheet, and still typeable: an empty grid with no cells at
+        // all left the User with nowhere to start.
+        None => (0, 0),
     };
 
-    let last_row = last_row.min(first_row + window.max_rows.saturating_sub(1) as u32);
-    let last_col = last_col.min(first_col + window.max_cols.saturating_sub(1) as u16);
+    let last_row = used_last_row
+        .saturating_add(ROOM_BELOW)
+        .min(window.max_rows.saturating_sub(1) as u32);
+    let last_col = used_last_col
+        .saturating_add(ROOM_RIGHT)
+        .min(window.max_cols.saturating_sub(1) as u16);
 
     let mut rows = Vec::new();
     for row in first_row..=last_row {
@@ -442,13 +452,26 @@ mod tests {
         assert_eq!(model.file_name, "model.xlsx");
         let sheet = model.active_sheet().expect("one sheet");
         assert_eq!(sheet.name, "Summary");
-        assert_eq!(
-            sheet.first_row, 4,
-            "the rectangle should start where the data does, not at row 0"
-        );
+        // A1, always. The data in this fixture starts at row 5, and a sheet that begins at row 5
+        // is a sheet the User cannot put a heading above.
+        assert_eq!(sheet.first_row, 0, "a sheet starts at A1");
         assert_eq!(sheet.first_col, 0);
-        assert_eq!(sheet.row_count(), 3, "header plus two months");
-        assert_eq!(sheet.col_count(), 4);
+        // The data ends at row 7 and there is room below it to type in, so the rectangle is
+        // taller than the data.
+        assert!(
+            sheet.row_count() > 7,
+            "there should be room below the data: {} rows",
+            sheet.row_count()
+        );
+        assert!(sheet.col_count() >= 4);
+
+        // The values are still where they were: reading from A1 must not shift anything.
+        let heading = sheet.at(4, 0).expect("row 5 should be readable");
+        assert_eq!(heading.display, "Month");
+        assert!(
+            sheet.at(0, 0).is_some_and(|cell| cell.display.is_empty()),
+            "A1 itself is there, and empty"
+        );
     }
 
     #[test]
@@ -563,8 +586,17 @@ mod tests {
         }
         let model = read(&path, Window::default()).unwrap();
         let sheet = model.active_sheet().unwrap();
-        assert_eq!(sheet.row_count(), 0);
-        assert_eq!(sheet.col_count(), 0);
+        // Empty, and still a sheet: somewhere to start typing rather than a blank refusal.
+        assert!(sheet.row_count() > 0, "an empty sheet is still typeable");
+        assert!(sheet.col_count() > 0);
+        assert!(
+            sheet
+                .rows
+                .iter()
+                .flatten()
+                .all(|cell| cell.display.is_empty()),
+            "and everything in it is empty"
+        );
     }
 
     #[test]

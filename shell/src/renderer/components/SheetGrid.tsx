@@ -63,6 +63,7 @@ export function SheetGrid({
   onEditMany,
   onSelection,
   onUndo,
+  onRedo,
   onSheets,
 }: {
   model: GridModel;
@@ -92,6 +93,8 @@ export function SheetGrid({
   }) => void;
   /** Put the last change back. Absent where the file cannot be written. */
   onUndo?: () => void;
+  /** Put an undone change forward again. */
+  onRedo?: () => void;
   /** Add, rename or remove a sheet. Absent where the file cannot be written. */
   onSheets?: (what: "add sheet" | "rename sheet" | "delete sheet", sheet: string, name?: string) => void;
 }) {
@@ -297,9 +300,12 @@ export function SheetGrid({
         break;
     }
 
-    if (meta && (event.key === "z" || event.key === "Z") && onUndo) {
+    if (meta && (event.key === "z" || event.key === "Z")) {
       event.preventDefault();
-      onUndo();
+      // Shift with it puts the change forward again, which is where every hand already
+      // reaches for redo.
+      if (event.shiftKey) onRedo?.();
+      else onUndo?.();
       return;
     }
 

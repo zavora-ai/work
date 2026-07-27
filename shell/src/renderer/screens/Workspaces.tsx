@@ -269,6 +269,12 @@ export function SpreadsheetWorkspace(
     setEditedAt(Date.now());
   };
 
+  const redoLast = async () => {
+    if (!props.path) return;
+    await window.studio?.redo?.({ path: props.path, thread: props.thread ?? "spreadsheet" });
+    setEditedAt(Date.now());
+  };
+
   const applyFormat = async (how: Record<string, unknown>) => {
     if (!props.path || !selection) return;
     await window.studio?.format?.({
@@ -322,6 +328,7 @@ export function SpreadsheetWorkspace(
       }
       onSelection={setSelection}
       onUndo={props.path ? () => void undoLast() : undefined}
+      onRedo={props.path ? () => void redoLast() : undefined}
       onSheets={
         props.path
           ? (what, sheetName, name) => {
@@ -373,6 +380,9 @@ export function SpreadsheetWorkspace(
               absent control is better than one that lies. */}
           <Button small title="Undo the last change" onClick={() => void undoLast()}>
             Undo
+          </Button>
+          <Button small title="Put an undone change forward again" onClick={() => void redoLast()}>
+            Redo
           </Button>
           {/* The things a person does to a spreadsheet that are not typing in it. Each acts on
               what is selected and goes through the same gate and history as any other change. */}

@@ -282,6 +282,7 @@ pub fn router(api: Arc<Api>) -> Router {
         .route("/edit", axum::routing::post(edit))
         .route("/format", axum::routing::post(format_cells))
         .route("/undo", axum::routing::post(undo))
+        .route("/redo", axum::routing::post(redo))
         .route("/sheet/act", axum::routing::post(act_on_sheet))
         // What each specialist may reach, and which of those are on.
         .route("/capabilities", get(capabilities).post(add_capability))
@@ -813,6 +814,9 @@ async fn undo(
     };
     let what = undoable.what;
 
+    // What the undo is about to displace, read before it writes, so it can be put forward again.
+    let displaced = cells_as_they_are(&body.path, &undoable.where_at, &undoable.before);
+
     match engine
         .edit_many_by_hand(&body.path, &undoable.where_at, &undoable.before)
         .await
@@ -822,11 +826,59 @@ async fn undo(
             // The undo is itself a change, and it says what it undid. A history that hides its
             // own corrections is a history the User cannot trust.
             keeper.record_change(&body.path, &format!("you undid: {what}"), true);
+            keeper.keep_for_redo(&body.path, &undoable.where_at, &displaced);
             keeper.log("action", &format!("you undid: {what}"));
             Json(serde_json::json!({ "done": true, "undid": what })).into_response()
         }
         Err(error) => problem(error.to_string(), error.detail()),
     }
+}
+
+/// Put an undone change forward again.
+#[cfg(feature = "adk")]
+async fn redo(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(body): Json<UndoRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    let Some(engine) = api.engine() else {
+        return problem("Work Studio cannot change that file yet".into(), None);
+    };
+    let Some(keeper) = api.keeper.as_ref() else {
+        return problem("Nothing is being kept this session".into(), None);
+    };
+    let Some(redoable) = keeper.last_redoable(&body.path) else {
+        return problem("There is nothing to put forward".into(), None);
+    };
+
+    match engine
+        .edit_many_by_hand(&body.path, &redoable.where_at, &redoable.before)
+        .await
+    {
+        Ok(()) => {
+            keeper.redo_used(&body.path);
+            let said = redoable.what.replace("you undid: ", "");
+            keeper.record_change(&body.path, &format!("you put back: {said}"), true);
+            keeper.log("action", &format!("you put back: {said}"));
+            Json(serde_json::json!({ "done": true, "putBack": said })).into_response()
+        }
+        Err(error) => problem(error.to_string(), error.detail()),
+    }
+}
+
+#[cfg(not(feature = "adk"))]
+async fn redo(
+    State(api): State<Arc<Api>>,
+    headers: HeaderMap,
+    Json(_body): Json<UndoRequest>,
+) -> axum::response::Response {
+    if !api.authorised(&headers) {
+        return (StatusCode::UNAUTHORIZED, "").into_response();
+    }
+    problem("Work Studio cannot change that file yet".into(), None)
 }
 
 #[derive(Debug, Deserialize)]

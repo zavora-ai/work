@@ -184,15 +184,18 @@ describe("reading a spreadsheet", { skip: available ? false : "Core not built" }
     assert.equal(model.fileName, "zws-demo.xlsx");
     const sheet = model.sheets[0]!;
     assert.equal(sheet.name, "Summary");
-    assert.equal(sheet.firstRow, 4, "the sheet's real position must survive");
-    assert.equal(sheet.rows[0]![0]!.display, "Month");
+    // A sheet starts at A1, as every spreadsheet does; the data's own position survives inside
+    // it, which is what these row offsets check.
+    assert.equal(sheet.firstRow, 0, "a sheet starts at A1");
+    assert.equal(sheet.rows[0]![0]!.display, "", "A1 is there, and empty");
+    assert.equal(sheet.rows[4]![0]!.display, "Month", "the heading is still on row 5");
     assert.equal(
-      sheet.rows[1]![3]!.formula,
+      sheet.rows[5]![3]!.formula,
       "=C6*1.12",
       "a formula cell must carry its formula for the formula bar",
     );
     assert.equal(
-      sheet.rows[1]![3]!.display,
+      sheet.rows[5]![3]!.display,
       "5555200",
       "and its value already formatted, so the renderer never calculates",
     );

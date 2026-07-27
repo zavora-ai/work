@@ -496,6 +496,65 @@ impl Keeper {
 
     /// Forget an undo once it has been used, so pressing undo twice steps further back rather
     /// than putting the same values in again.
+    /// Note what an undo displaced, against the entry the undo wrote.
+    ///
+    /// Held separately from the undo record so that pressing undo again steps further back
+    /// rather than putting the change it just removed back in.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn keep_for_redo(&self, path: &str, where_at: &str, displaced: &[(String, String)]) {
+        if displaced.is_empty() {
+            return;
+        }
+        let Ok(store) = self.store.lock() else { return };
+        let id = format!("art-{:x}", fnv(path));
+        let cells = serde_json::to_string(displaced).unwrap_or_default();
+        if let Err(error) = store.conn().execute(
+            "UPDATE artefact_changes SET redo_cells = ?1, undo_where = ?2
+             WHERE artefact_id = ?3
+               AND seq = (SELECT max(seq) FROM artefact_changes WHERE artefact_id = ?3)",
+            rusqlite::params![cells, where_at, id],
+        ) {
+            eprintln!("[core] this cannot be put forward again: {error}");
+        }
+    }
+
+    /// The most recent undo that can be put forward again.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn last_redoable(&self, path: &str) -> Option<Undoable> {
+        let store = self.store.lock().ok()?;
+        let id = format!("art-{:x}", fnv(path));
+        let row: Option<(String, String, String)> = store
+            .conn()
+            .query_row(
+                "SELECT description, undo_where, redo_cells FROM artefact_changes
+                 WHERE artefact_id = ?1 AND redo_cells IS NOT NULL
+                 ORDER BY seq DESC LIMIT 1",
+                [&id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .ok();
+        let (what, where_at, cells) = row?;
+        Some(Undoable {
+            what,
+            where_at,
+            before: serde_json::from_str(&cells).ok()?,
+        })
+    }
+
+    /// Spend a redo, so pressing it twice does not write the same values again.
+    #[cfg_attr(not(feature = "adk"), allow(dead_code))]
+    pub fn redo_used(&self, path: &str) {
+        let Ok(store) = self.store.lock() else { return };
+        let id = format!("art-{:x}", fnv(path));
+        let _ = store.conn().execute(
+            "UPDATE artefact_changes SET redo_cells = NULL
+             WHERE artefact_id = ?1
+               AND seq = (SELECT max(seq) FROM artefact_changes
+                          WHERE artefact_id = ?1 AND redo_cells IS NOT NULL)",
+            [&id],
+        );
+    }
+
     #[cfg_attr(not(feature = "adk"), allow(dead_code))]
     pub fn undo_used(&self, path: &str) {
         let Ok(store) = self.store.lock() else { return };
