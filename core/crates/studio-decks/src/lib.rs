@@ -53,6 +53,13 @@ pub struct Slide {
     /// What each drawn element refers to, by position. `None` where the drawing came from
     /// something the User cannot yet change.
     pub targets: Vec<Option<Target>>,
+    /// What the speaker is meant to say over this slide, where the deck says.
+    ///
+    /// The presenter needs it in front of them, and it is what an agent presenting the deck has to
+    /// work from — without it the agent would be inventing the talk rather than giving the one the
+    /// deck was written for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
 }
 
 impl Slide {
@@ -117,8 +124,15 @@ pub fn read(path: &std::path::Path) -> Result<DeckModel> {
                 })
             })
             .collect();
+        let notes = presentation
+            .slide(index)
+            .ok()
+            .and_then(|slide| slide.notes().map(str::to_string))
+            .filter(|notes| !notes.trim().is_empty());
+
         slides.push(Slide {
             number: index + 1,
+            notes,
             title: title_of(&scene, index),
             item_count: scene.items.len(),
             targets,
@@ -346,5 +360,61 @@ mod tests {
             back.active_slide().unwrap().target_at(0),
             model.active_slide().unwrap().target_at(0)
         );
+    }
+}
+
+#[cfg(test)]
+mod notes_tests {
+    use super::*;
+
+    /// An agent asked to present a deck has to say what the deck says. Without the notes it would
+    /// be inventing the talk.
+    #[test]
+    fn the_speaker_notes_are_read() {
+        let path = std::env::temp_dir().join(format!("zws-notes-{}.pptx", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        {
+            use zavora_slide::{Emu, Layout};
+            let mut deck = Presentation::new();
+            let index = deck.add_slide(Layout::Blank);
+            let mut slide = deck.slide_mut(index).unwrap();
+            slide.add_text_box(
+                "Revenue by region",
+                Emu(914_400),
+                Emu(914_400),
+                Emu(6_400_800),
+                Emu(1_000_000),
+            );
+            slide.set_notes("Start with the shortfall in the north, then the plan.");
+            deck.save(&path).unwrap();
+        }
+
+        let model = read(&path).expect("reads");
+        assert_eq!(
+            model.slides[0].notes.as_deref(),
+            Some("Start with the shortfall in the north, then the plan."),
+            "the talk the deck was written for is missing"
+        );
+    }
+
+    /// A deck with no notes says so, rather than offering an empty string to talk over.
+    #[test]
+    fn a_deck_without_notes_says_nothing() {
+        let path = std::env::temp_dir().join(format!("zws-nonotes-{}.pptx", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        {
+            use zavora_slide::{Emu, Layout};
+            let mut deck = Presentation::new();
+            let index = deck.add_slide(Layout::Blank);
+            deck.slide_mut(index).unwrap().add_text_box(
+                "Only a title",
+                Emu(914_400),
+                Emu(914_400),
+                Emu(6_400_800),
+                Emu(1_000_000),
+            );
+            deck.save(&path).unwrap();
+        }
+        assert_eq!(read(&path).expect("reads").slides[0].notes, None);
     }
 }

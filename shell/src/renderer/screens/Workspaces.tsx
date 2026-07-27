@@ -19,6 +19,7 @@ import { useAsk, type Turn } from "../useAsk.ts";
 import { useSteering } from "../useOwn.ts";
 import { SteeringPanel } from "../components/SteeringPanel.tsx";
 import { t } from "../../shared/strings.ts";
+import { Presenting } from "./Presenting.tsx";
 import { Button, Card, Field, Icon } from "../components/primitives.tsx";
 import { SheetGrid } from "../components/SheetGrid.tsx";
 import { Failure, Progress } from "../components/states.tsx";
@@ -792,6 +793,9 @@ export function DeckWorkspace(
 
   const slides = deck.model?.slides ?? [];
   const slide = slides[active];
+  // Presenting takes over the screen, so it is a state of this workspace rather than a route: the
+  // deck being presented is the deck that was open.
+  const [presenting, setPresenting] = useState(false);
 
   // A click on the drawing tells us which element it was and, because the Core recorded
   // what each one came from, what could actually be changed.
@@ -809,12 +813,31 @@ export function DeckWorkspace(
     );
   };
 
+
+  if (presenting) {
+    return (
+      <Presenting
+        slides={slides}
+        startAt={active}
+        onLeave={() => setPresenting(false)}
+      />
+    );
+  }
+
   return (
     <Workspace
       {...props}
       fileName={deck.model?.fileName ?? "Deck"}
       toolbar={
         <>
+          <Button
+            small
+            title="Show the deck full screen"
+            onClick={() => setPresenting(true)}
+            disabled={slides.length === 0}
+          >
+            {t("deck.present")}
+          </Button>
           <Button small>Text</Button>
           <Button small>Shape</Button>
           <Button small>Chart</Button>

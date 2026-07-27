@@ -139,6 +139,13 @@ pub const CATALOGUE: &[Entry] = &[
     p("new.starting", "Making a start…"),
     p("sheet.add", "Add a sheet"),
     p("doc.page", "Page"),
+    p("present.heading", "Presenting"),
+    p("present.nothing", "There are no slides to present."),
+    p("present.back", "Back a slide"),
+    p("present.forward", "On a slide"),
+    p("present.notes", "Your notes"),
+    p("present.leave", "Stop presenting"),
+    p("deck.present", "Present"),
     p("sheet.rename", "Rename this sheet"),
     p("sheet.delete", "Delete this sheet"),
     p(
