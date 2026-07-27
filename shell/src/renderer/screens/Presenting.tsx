@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { t } from "../../shared/strings.ts";
 import { bridge } from "../useOwn.ts";
+import { SpeechPlayer } from "../speech.ts";
 
 export interface PresentableSlide {
   number: number;
@@ -43,45 +44,12 @@ export function Presenting({
   // Whether the presenting is being done aloud, and what is being said now.
   const [aloud, setAloud] = useState(false);
   const [saying, setSaying] = useState<string | undefined>();
-  const playing = useRef<HTMLAudioElement | null>(null);
+
+  // The presenter is a session held open by the Core while the deck is up. Sound arrives in pieces
+  // and is queued as it comes, so the voice keeps up with the slide.
+  const player = useRef<SpeechPlayer | undefined>(undefined);
   const [speaking, setSpeaking] = useState(false);
-
-  const stopTalking = useCallback(() => {
-    playing.current?.pause();
-    playing.current = null;
-    setSaying(undefined);
-    setSpeaking(false);
-  }, []);
-
-  /** Say the words for a slide, stopping whatever was being said. */
-  const say = useCallback(
-    async (slideNumber: number) => {
-      const words = talk?.find((one) => one.slide === slideNumber)?.words;
-      if (!words) {
-        setSaying(undefined);
-        return;
-      }
-      stopTalking();
-      setSaying(words);
-      const answer = (await bridge()?.speak?.({ words })) as
-        | { wav?: string; problem?: string }
-        | undefined;
-      if (!answer?.wav) {
-        // Said on screen even when it cannot be said aloud, so a presenter is not left with a
-        // silent slide and no idea why.
-        return;
-      }
-      const sound = new Audio(`data:audio/wav;base64,${answer.wav}`);
-      playing.current = sound;
-      // Recorded on the surface so it can be seen from outside that the words are being said and
-      // not merely shown — a silent presentation that claims to be talking is the failure worth
-      // catching.
-      sound.addEventListener("playing", () => setSpeaking(true));
-      sound.addEventListener("ended", () => setSpeaking(false));
-      void sound.play().catch(() => setSpeaking(false));
-    },
-    [stopTalking, talk],
-  );
+  const listening = useRef(false);
 
   const go = useCallback(
     (by: number) => {
@@ -90,6 +58,70 @@ export function Presenting({
     [slides.length],
   );
 
+  const stopTalking = useCallback(() => {
+    player.current?.stop();
+    setSpeaking(false);
+    void bridge()?.presentHush?.();
+  }, []);
+
+  /** Take whatever the presenter has said and play it, until it stops. */
+  const listen = useCallback(async () => {
+    if (listening.current) return;
+    listening.current = true;
+    try {
+      // Asked for repeatedly rather than once: the presenter is still deciding what to say while
+      // the first of it is already being played.
+      for (let round = 0; round < 400; round += 1) {
+        const answer = (await bridge()?.presentHeard?.()) as
+          | { heard?: Record<string, { base64?: string; text?: string; detail?: string }>[] }
+          | undefined;
+        const heard = answer?.heard ?? [];
+        if (heard.length === 0) break;
+
+        let finished = false;
+        for (const one of heard) {
+          if (typeof one === "string") {
+            if (one === "finished") finished = true;
+            continue;
+          }
+          if (one.sound?.base64) {
+            player.current ??= new SpeechPlayer();
+            player.current.add(one.sound.base64);
+            setSpeaking(true);
+          }
+          if (one.words?.text) {
+            setSaying((said) => `${said ?? ""}${one.words!.text}`);
+          }
+          if (one.finished !== undefined || "finished" in one) finished = true;
+        }
+        if (finished) break;
+      }
+    } finally {
+      listening.current = false;
+    }
+  }, []);
+
+  /** Present a slide: say its words, cutting off whatever was being said. */
+  const say = useCallback(
+    async (slideNumber: number) => {
+      const words = talk?.find((one) => one.slide === slideNumber)?.words;
+      if (!words) {
+        setSaying(undefined);
+        return;
+      }
+      // The interruption is the point of a session: moving on stops the last slide rather than
+      // queueing behind it.
+      player.current?.stop();
+      setSaying("");
+      await bridge()?.presentSay?.({ words });
+      void listen();
+    },
+    [listen, talk],
+  );
+
+  // The keys a presenter's hands already know. On the window rather than on an element, because a
+  // presenter is looking at the slide and not at whatever happens to hold the focus — losing this
+  // is how the arrows stopped moving the deck.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       switch (event.key) {
@@ -116,11 +148,11 @@ export function Presenting({
           return;
         case "Escape":
           event.preventDefault();
+          stopTalking();
           onLeave();
           return;
         case "n":
         case "N":
-          // The presenter's own notes, on the presenter's own screen.
           setShowNotes((shown) => !shown);
           return;
         default:
@@ -129,7 +161,7 @@ export function Presenting({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, onLeave, slides.length]);
+  }, [go, onLeave, slides.length, stopTalking]);
 
   const slide = slides[at];
 
@@ -140,8 +172,19 @@ export function Presenting({
     void say(slide.number);
   }, [aloud, at, say, slide]);
 
-  // Nothing keeps talking after the presenting stops.
-  useEffect(() => stopTalking, [stopTalking]);
+  // Told when the voice has stopped, so the screen does not claim it is still talking.
+  useEffect(() => {
+    player.current?.whenQuiet(() => setSpeaking(false));
+  }, [speaking]);
+
+  // Nothing keeps talking after the deck comes down, and the session is let go.
+  useEffect(
+    () => () => {
+      player.current?.close();
+      void bridge()?.presentEnd?.();
+    },
+    [],
+  );
 
   if (!slide) {
     return (
@@ -246,8 +289,14 @@ export function Presenting({
               if (aloud) {
                 setAloud(false);
                 stopTalking();
+                void bridge()?.presentEnd?.();
               } else {
-                setAloud(true);
+                // Opened when asked for, not when the deck opens: a presenter nobody asked for
+                // should not be holding a session open.
+                void (async () => {
+                  await bridge()?.presentBegin?.({ about: slides[0]?.title ?? "" });
+                  setAloud(true);
+                })();
               }
             }}
             style={dark}

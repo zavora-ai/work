@@ -36,6 +36,12 @@ contextBridge.exposeInMainWorld("studio", {
   }) => ipcRenderer.invoke("core:addCapability", body),
   capabilityAction: (body: { id: string; action: string; agents?: string[] }) =>
     ipcRenderer.invoke("core:capabilityAction", body),
+  presentBegin: (body: { voice?: string; about?: string }) =>
+    ipcRenderer.invoke("core:presentBegin", body),
+  presentSay: (body: { words: string }) => ipcRenderer.invoke("core:presentSay", body),
+  presentHush: () => ipcRenderer.invoke("core:presentHush"),
+  presentEnd: () => ipcRenderer.invoke("core:presentEnd"),
+  presentHeard: () => ipcRenderer.invoke("core:presentHeard"),
   talk: (path: string) => ipcRenderer.invoke("core:talk", path),
   speak: (body: { words: string; voice?: string }) => ipcRenderer.invoke("core:speak", body),
   sheetAct: (body: Record<string, unknown>) => ipcRenderer.invoke("core:sheetAct", body),

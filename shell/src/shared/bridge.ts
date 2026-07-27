@@ -78,6 +78,17 @@ export interface StudioBridge {
    *
    * Goes the same way an agent's change does, so one history holds both.
    */
+  /**
+   * A presenter held open while the deck is up, so what is being said can be cut off the moment
+   * the presenter moves on.
+   */
+  presentBegin(body: { voice?: string; about?: string }): Promise<unknown>;
+  presentSay(body: { words: string }): Promise<unknown>;
+  presentHush(): Promise<unknown>;
+  presentEnd(): Promise<unknown>;
+  /** Whatever has been said since last asked: sound to play and words to show. */
+  presentHeard(): Promise<unknown>;
+
   /** What to say over each slide of a deck. */
   talk(path: string): Promise<unknown>;
   /** Say something aloud. Answers with the sound itself, not a link to it. */
